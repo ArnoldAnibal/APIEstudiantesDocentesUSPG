@@ -1,6 +1,7 @@
 ## API con PHP y MySQLi
 
-Este proyecto es una API RESTful desarrollada en PHP utilizando MySQLi como método de conexión a la base de datos. El propósito es administrar dos tablas: estudiantes y docentes, con un CRUD (crear, leer, actualizar, eliminar).
+Este proyecto es una API desarrollada en PHP utilizando MySQLi como método de conexión a la base de datos. El propósito es administrar dos tablas: estudiantes y docentes, con un CRUD (crear, leer, actualizar, eliminar).
+Fue creada para la clase de programación III en USPG para la carrera de Ingeniera en sistemas
 
 ## Estructura del proyecto
 
