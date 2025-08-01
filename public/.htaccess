@@ -1,0 +1,9 @@
+#habilitamos el motor de reescritura de URL
+RewriteEngine On
+
+#si no es archivo ni directorio, entonces nos envia a index.php
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Reescribe la URL a index.php
+RewriteRule ^ index.php [QSA,L]
