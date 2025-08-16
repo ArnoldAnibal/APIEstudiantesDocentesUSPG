@@ -5,59 +5,98 @@ Fue creada para la clase de programación III en USPG para la carrera de Ingenie
 
 ## Estructura del proyecto
 
-apidocente/
-    connection/
-        db.php                # Clase de conexión a MySQL (usando mysqli)
-    controllers/
-        estudiantesController.php
-        docentesController.php
-    models/
-        docente.php
-        estudiante.php
-    routes/
-        rutas.php             # Interpretación de URI para enrutar a controladores
-    public/
-        index.php             # Punto de partida
-        .htaccess             # Permite reescritura de URLs
+APIDocente/
+connection/
+    db.php
+models/
+    Docente.php
+    Estudiante.php
+repositories/
+    DocenteRepository.php
+    EstudianteRepository.php
+services/
+    DocenteService.php
+    EstudianteService.php
+controllers/
+    DocenteController.php
+    EstudianteController.php
+routes/
+    rutas.php
+public/
+    index.php
+    .htaccess
+README.txt
 
 
 ## Queries disponibles
 
 ### Estudiantes
-    GET /estudiantes -> Lista todos los estudiantes
-    POST /estudiantes -> Crea un nuevo estudiante
+    GET -> Lista todos los estudiantes
+
+        http://localhost/APIDocente/public/index.php/estudiantes  -> todos los estudiantes
+        http://localhost/APIDocente/public/index.php/estudiantes/{id}  -> por ID
+
+
+    POST -> Crea un nuevo estudiante
+
+    http://localhost/APIDocente/public/index.php/estudiantes
+        En el body tipo raw
             {
-            "nombres": "nombres",
-            "apellidos": "apellidos"
+            "nombres":"nombre",
+            "apellidos":"apellido"
             }
-    PUT /estudiantes/ -> Actualiza un estudiante
+
+
+    PUT -> Actualiza un estudiante
+
+    http://localhost/APIDocente/public/index.php/estudiantes/{id}
+        En el body tipo raw
             {
             "id": id,
             "nombres": "nombres",
             "apellidos": "apellidos"
             }
 
-    DELETE /estudiantes -> Elimina un estudiante
+    DELETE -> Elimina un estudiante
+
+    http://localhost/APIDocente/public/index.php/estudiantes/{id}
+        En el body tipo raw
             {
             "id": id
             }
 
 
-### Docentes
-    GET /docentes -> Lista todos los docentes
-    POST /docentes -> Crea un nuevo docente
+## Docentes
+    GET -> Lista todos los docentes
+
+        http://localhost/APIDocente/public/index.php/docentes  -> todos los docentes
+        http://localhost/APIDocente/public/index.php/docentes/{id}  -> por ID
+
+
+    POST -> Crea un nuevo estudiante
+
+    http://localhost/APIDocente/public/index.php/docentes
+        En el body tipo raw
             {
-            "nombres": "nombres",
-            "apellidos": "apellidos"
+            "nombres":"nombre",
+            "apellidos":"apellido"
             }
-    PUT /docentes/ -> Actualiza un docente
+
+
+    PUT -> Actualiza un estudiante
+
+    http://localhost/APIDocente/public/index.php/docentes/{id}
+        En el body tipo raw
             {
             "id": id,
             "nombres": "nombres",
             "apellidos": "apellidos"
             }
 
-    DELETE /docentes?id=id -> Elimina un docente
+    DELETE -> Elimina un estudiante
+
+    http://localhost/APIDocente/public/index.php/docentes/{id}
+        En el body tipo raw
             {
             "id": id
             }

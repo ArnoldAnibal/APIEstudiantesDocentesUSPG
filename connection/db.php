@@ -1,33 +1,25 @@
 <?php
-class DB {
-    // parametros para la conexión con la bd
-private $host = "localhost";
-private $dbName = "uspg";
-private $username = "root";
-private $password = "";
-public $connection;
+// Clase de conexión a la base de datos usando mysqli
 
-// funcion de conexión con mysqli ya que no se pudo con PDO
-public function connectionDB(){
-    //inicio de conexión
-    $this->connection = new mysqli(
-        $this->host,
-            $this->username,
-            $this->password,
-            $this->dbName
-    );
+class ConexionBD {  // clase de conexión
+    private $host = "localhost";
+    private $usuario = "root";  // usuario de la bd
+    private $clave = "";  
+    private $bd = "uspg";  // nombre de la bd
+    private $conexion;
 
-    // condicional para confirmar si funciono
-    if ($this->connection->connect_error) {
-            die(json_encode(["error" => "Error de conexión: " . $this->connection->connect_error]));
+    public function __construct() {  // constructor que se ejecuta para crear un objeto de conexión
+        // Creamos la conexión a la base de datos
+        $this->conexion = new mysqli($this->host, $this->usuario, $this->clave, $this->bd);
+
+        // Verificamos si hay error en la conexión
+        if ($this->conexion->connect_error) {
+            die("Error de conexión a la base de datos: " . $this->conexion->connect_error);
         }
+    }
 
-    //configuracion del charset a usar en la conexion
-    $this->connection->set_charset("utf8mb4");
-
-    // retornar la conexion exitosa para usarla en los otros elementos
-    return $this->connection;
+    public function getConexion() {  // creamos un método publico para obtener la conexión activa
+        return $this->conexion;
+    }
 }
-}
-
 ?>

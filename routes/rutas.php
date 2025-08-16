@@ -1,63 +1,33 @@
 <?php
-// cargamos la informacion de ambos ficheros
-require_once __DIR__ . '/../connection/db.php';
-require_once __DIR__ . '/../controllers/estudiantesController.php';
-require_once __DIR__ . '/../controllers/docentesController.php';
 
-// se hace instancia a la clase DB y se conecta 
-$db = (new DB())->connectionDB();
-
-// se extraen las partes de la Url, se separan por el / 
-$uri = explode("/", trim($_SERVER['REQUEST_URI'], "/"));
-
-// obtenemos la uri que pueda venir por el URL para saber que controlador usar
-$resource = $uri[2] ?? null;
-
-switch ($resource) {
-    case 'estudiantes':
-        // se hace instancia al controladdr de estudiantes y docentes con la conexión a la bd
-        $controller = new estudiantesController($db);
-        break;
-    case 'docentes':
-        // se hace instancia al controladdr de estudiantes y docentes con la conexión a la bd
-        $controller = new docentesController($db);
-        break;
-    default:
-        http_response_code(404);
-        echo json_encode(["error" => "Recurso no encontrado"]);
-        exit;
-        
-}
+// incluimos los controladores
+require_once __DIR__ . '/../controllers/DocenteController.php';
+require_once __DIR__ . '/../controllers/EstudianteController.php';
 
 
-
-// se deteca el metodo HTTP de la solicitud
+// obtenemos la URI de la petición ylo dividimos por cada /
+$uri = explode('/', trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/'));
+// obtenemos el metodo que quieren usar
 $method = $_SERVER['REQUEST_METHOD'];
+// se revisa el contenido json que nos enviaron y se convierte en un arreglo
+$input = json_decode(file_get_contents('php://input'), true);
 
-// capturamos el cuerpo del JSON y se convierte en array
-$input = json_decode(file_get_contents("php://input"), true);
-// obtenemos la id  que pueda venir por el body para usarlo en el delete
-$id = $input['id'] ?? null;
-
-
-// segun el método HTTP se llama al metodo correspondiente del controlador, los datos son enviados en json
-switch($method){
-    case 'GET':
-        $controller->index();
-        break;
-    case 'POST':
-        $controller->guardar($input);
-        break;
-    case 'PUT':
-        $controller->actualizar($id,$input);
-        break;
-    case 'DELETE':
-        $controller->eliminar($id);
-        break;
-    default:
-        http_response_code(405);
-        echo json_encode(["error" => "Método no permitido"]);
-        break;
+// Buscamos el recurso principal (docentes o estudiantes)
+if (in_array("docentes", $uri)) {
+    $controller = new DocenteController();  // hacemos una instancia del controlador
+    // Si hay un número después de 'docentes', lo tomamos como ID
+    $pos = array_search("docentes", $uri);  // buscamos el uri
+    $id = $uri[$pos + 1] ?? null;  // sacamos el id si lo mandaron
+    $controller->manejar($method, $id, $input);  // usamos el metodo manejar del controlador
 }
-
+elseif (in_array("estudiantes", $uri)) {
+    $controller = new EstudianteController(); // hacemos una instancia del controlador
+    // Si hay un número después de 'estudiantes', lo tomamos como ID
+    $pos = array_search("estudiantes", $uri); // buscamos el uri
+    $id = $uri[$pos + 1] ?? null; // sacamos el id si lo mandaron
+    $controller->manejar($method, $id, $input); // usamos el metodo manejar del controlador
+}
+else {
+    echo json_encode(["error" => "Ruta no encontrada"]);  // mensaje de error
+}
 ?>
