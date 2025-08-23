@@ -60,10 +60,7 @@ README.txt
     DELETE -> Elimina un estudiante
 
     http://localhost/APIDocente/public/index.php/estudiantes/{id}
-        En el body tipo raw
-            {
-            "id": id
-            }
+
 
 
 ## Docentes
@@ -96,10 +93,7 @@ README.txt
     DELETE -> Elimina un estudiante
 
     http://localhost/APIDocente/public/index.php/docentes/{id}
-        En el body tipo raw
-            {
-            "id": id
-            }
+
 
 ## Métodos soportados
 
