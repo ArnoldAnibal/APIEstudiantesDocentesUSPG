@@ -1,8 +1,9 @@
 <?php
-// Service para llevar la Lógica de negocio de docentes, tambien encapsulamos las operaciones y relgas del negocio usando el
+// Service para llevar la Lógica de negocio de docentes, tambien encapsulamos operaciones, reglas, y validaciones antes de ir al repositorio
 
 // incluimos repositorios
 require_once __DIR__ . '/../repositories/DocenteRepository.php';
+require_once __DIR__ . '/../models/Docente.php';
 
 class DocenteService {
     // creamos una propiedad privada que lamacena la instancia del repositorio
@@ -13,31 +14,28 @@ class DocenteService {
         $this->repo = new DocenteRepository();  // nueva instancia del repositorio
     }
 
-    public function listar() {
-        return $this->repo->obtenerTodos();  // llama al metodo del repositorio para tener todos los registros
+    public function getAll(): array {
+        return $this->repo->findAll();  // llama al metodo del repositorio para tener todos los registros
     }
 
-    public function obtener($id) {
-        return $this->repo->obtenerPorId($id);  // lama al metodo del repositorio para obtener solo un registro en base a su id
+    public function getById($id): ?Docente {
+        return $this->repo->findById($id);  // lama al metodo del repositorio para obtener solo un registro en base a su id
     }
 
-    public function crear($data) {
-        $docente = new Docente();  // nueva instancia del modelo
-        $docente->setNombres($data['nombres']);  //asignamos los nombres desde los datos recibidos
-        $docente->setApellidos($data['apellidos']);  // asignamos los apellidos desde los datos recibios
-        return $this->repo->crear($docente);  // llamo al repositorio para insertar el docente en la bd
+    public function create(array $data): bool {
+        // primero transformatos los datos en un objeto Docente
+        $docente = new Docente(null, $data['nombres'], $data['apellidos']);
+        return $this->repo->create($docente);  // llamo al repositorio para insertar el docente en la bd
     }
 
-    public function actualizar($id, $data) {
-        $docente = new Docente(); // nueva instancia del modelo
-        $docente->setId($id);  // asigna el id que se actualizara
-        $docente->setNombres($data['nombres']);  // actualizamos el nombre
-        $docente->setApellidos($data['apellidos']);  // actualizamos el apellido
-        return $this->repo->actualizar($docente);  // llamamos al repositorio para actualizar el registro
+    public function update($id, array $data): bool {
+        // creamos un nuevo objeto en base a los nuevos datos
+        $docente = new Docente($id, $data['nombres'], $data['apellidos']);
+        return $this->repo->update($docente);  // llamamos al repositorio para actualizar el registro
     }
 
-    public function eliminar($id) {
-        return $this->repo->eliminar($id);  // lamamos al repositorio para eliminar el registro
+    public function delete($id): bool {
+        return $this->repo->delete($id);  // lamamos al repositorio para eliminar el registro
     }
 }
 ?>

@@ -1,25 +1,24 @@
 <?php
 // Clase de conexión a la base de datos usando mysqli
 
-class ConexionBD {  // clase de conexión
-    private $host = "localhost";
-    private $usuario = "root";  // usuario de la bd
-    private $clave = "";  
-    private $bd = "uspg";  // nombre de la bd
-    private $conexion;
+class Database {  // clase de conexión
+    private static $host = "localhost";
+    private static $usuario = "root";  // usuario de la bd
+    private static $clave= "";  
+    private static $bd = "uspg";  // nombre de la bd
 
-    public function __construct() {  // constructor que se ejecuta para crear un objeto de conexión
-        // Creamos la conexión a la base de datos
-        $this->conexion = new mysqli($this->host, $this->usuario, $this->clave, $this->bd);
+    public static function getConnection(): mysqli {  // declaramos un metodo estatico publico que devuelva un objeto tipo mysqli. Lo estatico nos ayuda a llamarle sin hacerle una instancia a la clase get conection
+        $mysqli = new mysqli(self::$host, self::$usuario, self::$clave, self::$bd);
 
-        // Verificamos si hay error en la conexión
-        if ($this->conexion->connect_error) {
-            die("Error de conexión a la base de datos: " . $this->conexion->connect_error);
+        if ($mysqli->connect_error) {  // si hay un error de conexion, terminamos el codigo con el die.
+            die("Error de conexión mysqli: " . $mysqli->connect_error);
         }
+
+        // Forzar UTF-8
+        $mysqli->set_charset("utf8");
+
+        return $mysqli; // devolvemos el objeto de conexión mysqli para poder usarlo en otros lugares
     }
 
-    public function getConexion() {  // creamos un método publico para obtener la conexión activa
-        return $this->conexion;
-    }
 }
 ?>

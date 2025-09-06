@@ -6,28 +6,30 @@ require_once __DIR__ . '/../controllers/EstudianteController.php';
 
 
 // obtenemos la URI de la petición ylo dividimos por cada /
-$uri = explode('/', trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/'));
+$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 // obtenemos el metodo que quieren usar
 $method = $_SERVER['REQUEST_METHOD'];
 // se revisa el contenido json que nos enviaron y se convierte en un arreglo
-$input = json_decode(file_get_contents('php://input'), true);
+$inputData = json_decode(file_get_contents("php://input"), true) ?? [];
 
-// Buscamos el recurso principal (docentes o estudiantes)
-if (in_array("docentes", $uri)) {
-    $controller = new DocenteController();  // hacemos una instancia del controlador
-    // Si hay un número después de 'docentes', lo tomamos como ID
-    $pos = array_search("docentes", $uri);  // buscamos el uri
-    $id = $uri[$pos + 1] ?? null;  // sacamos el id si lo mandaron
-    $controller->manejar($method, $id, $input);  // usamos el metodo manejar del controlador
+// Inicializamos controladores para poder delegar las peticiones
+$docenteController = new DocenteController();
+$estudianteController = new EstudianteController();
+
+// Definición de rutas
+// verificamos si la url es de docentes o docentes/id. Si hay un numero despues de docentes/ lo guarda en $id para que se llame al metodo manejar del controlador pasando todos los datos
+if (preg_match('#^/APIDocente/public/index.php/docentes/?([0-9]*)$#', $uri, $matches)) {
+    $id = $matches[1] !== '' ? (int)$matches[1] : null;
+    $docenteController->manejar($method, $id, $inputData);
+
+} elseif (preg_match('#^/APIDocente/public/index.php/estudiantes/?([0-9]*)$#', $uri, $matches)) {
+    $id = $matches[1] !== '' ? (int)$matches[1] : null;
+    $estudianteController->manejar($method, $id, $inputData);
+
+} else {
+    // Ruta no encontrada
+    http_response_code(404);
+    echo json_encode(['error' => 'Ruta no encontrada']);
 }
-elseif (in_array("estudiantes", $uri)) {
-    $controller = new EstudianteController(); // hacemos una instancia del controlador
-    // Si hay un número después de 'estudiantes', lo tomamos como ID
-    $pos = array_search("estudiantes", $uri); // buscamos el uri
-    $id = $uri[$pos + 1] ?? null; // sacamos el id si lo mandaron
-    $controller->manejar($method, $id, $input); // usamos el metodo manejar del controlador
-}
-else {
-    echo json_encode(["error" => "Ruta no encontrada"]);  // mensaje de error
-}
+
 ?>

@@ -49,7 +49,7 @@ README.txt
 
     PUT -> Actualiza un estudiante
 
-    http://localhost/APIDocente/public/index.php/estudiantes/{id}
+    http://localhost/APIDocente/public/index.php/estudiantes
         En el body tipo raw
             {
             "id": id,
@@ -59,7 +59,11 @@ README.txt
 
     DELETE -> Elimina un estudiante
 
-    http://localhost/APIDocente/public/index.php/estudiantes/{id}
+    http://localhost/APIDocente/public/index.php/estudiantes
+    En el body tipo raw
+            {
+            "id": id
+            }
 
 
 
@@ -82,7 +86,7 @@ README.txt
 
     PUT -> Actualiza un estudiante
 
-    http://localhost/APIDocente/public/index.php/docentes/{id}
+    http://localhost/APIDocente/public/index.php/docentes
         En el body tipo raw
             {
             "id": id,
@@ -92,8 +96,11 @@ README.txt
 
     DELETE -> Elimina un estudiante
 
-    http://localhost/APIDocente/public/index.php/docentes/{id}
-
+    http://localhost/APIDocente/public/index.php/docentes
+    En el body tipo raw
+            {
+            "id": id
+            }
 
 ## Métodos soportados
 
@@ -103,4 +110,4 @@ GET, POST, PUT, DELETE
 ## Autor
 
 Desarrollado por: Arnold Avila
-Fecha: Agosto 2025
+Fecha: Septiembre 2025
