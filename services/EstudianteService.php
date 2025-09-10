@@ -1,39 +1,49 @@
 <?php
 // Service para llevar la Lógica de negocio de estudiantes, tambien encapsulamos operaciones, reglas, y validaciones antes de ir al repositorio
 
-// incluimos repositorios
+// incluimos repositorios, dtos, y mappers
 require_once __DIR__ . '/../repositories/EstudianteRepository.php';
-require_once __DIR__ . '/../models/Estudiante.php';
+require_once __DIR__ . '/../dto/EstudianteRequestDTO.php';
+require_once __DIR__ . '/../dto/EstudianteResponseDTO.php';
+require_once __DIR__ . '/../mapper/EstudianteMapper.php';
 
 class EstudianteService {
     // creamos una propiedad privada que lamacena la instancia del repositorio
-    private $repo;
+    private EstudianteRepository $repo;
 
     // constructor que inicializa el repositorio
     public function __construct() {
         $this->repo = new EstudianteRepository(); // nueva instancia del repositorio
     }
 
+    // obtener todos los docentes
     public function getAll(): array {
-        return $this->repo->findAll();  // llama al metodo del repositorio para tener todos los registros
+        $estudiantes = $this->repo->findAll();  // llama al metodo del repositorio para tener todos los registros
+        // convierte cada entidad Estudiante a ResponseDTO antes de devolverlo
+        return array_map(fn($d) => EstudianteMapper::mapEntityToResponseDTO($d), $estudiantes); // el array estudiantes tiene todos los objetos Estudiantes del FindAll. el array map es una funcion de php que aplica una funcion a cada elemento de un array y devuelve un nuevo array con los resultados. el fd($d) es una funcion anonima que recibe un elemento $d del array y lo pasa al mapper para volverlo DTO, y devuelve un array map donce cada objeto Estudiante se convirtió en un dto
     }
 
-    public function getById($id): ?Estudiante {
-        return $this->repo->findById($id); // lama al metodo del repositorio para obtener solo un registro en base a su id
+    // obtener docente por ID
+    public function getById($id): ?EstudianteResponseDTO {
+        $estudiante = $this->repo->findById($id); // llama al metodo repositorio para obtener un regirstro por ID
+        return $estudiante ? EstudianteMapper::mapEntityToResponseDTO($estudiante) : null; // Si existe, lo convierte a un responseDTO si no, devuelve null
     }
 
-    public function create(array $data): bool {
-        // primero transformatos los datos en un objeto Estudiante
-        $estudiante = new Estudiante(null, $data['nombres'], $data['apellidos']);
-        return $this->repo->create($estudiante);  // llamo al repositorio para insertar el docente en la bd
+    // creamos un nuevo docente, dto son los datos recibidos para la peticion
+    public function create(EstudianteRequestDTO $dto): EstudianteResponseDTO {
+        // primero transformatos los datos del DTO a un objeto Estudiante
+        $estudiante = EstudianteMapper::mapRequestDTOToEntity($dto);
+        return $this->repo->create($estudiante);  // llamo al repositorio para insertar el estudiante en la bd y retornamos el DTO resultante
     }
 
-    public function update($id,array $data): bool {
-        // creamos un nuevo objeto en base a los nuevos datos
-        $estudiante = new Estudiante($id, $data['nombres'], $data['apellidos']);
-        return $this->repo->update($estudiante); // llamamos al repositorio para actualizar el registro
+    // actualizar el docente, recibe un DTO con los datos recibidos en la peticion, y retorna un DTO acutalizado o null
+    public function update(EstudianteRequestDTO $dto): ?EstudianteResponseDTO {
+        // creamos un nuevo objeto a partir del DTO y se indica que es actualizacion
+        $estudiante = EstudianteMapper::mapRequestDTOToEntity($dto, true);
+        return $this->repo->update($estudiante); // lamamos al repositorio para actualizar y devolvemos el DTO resultante
     }
 
+    // eliminamos el docente por ID, recibimos el ID, y retornamos un bool si se elimino
     public function delete($id): bool {
         return $this->repo->delete($id);// lamamos al repositorio para eliminar el registro
     } 

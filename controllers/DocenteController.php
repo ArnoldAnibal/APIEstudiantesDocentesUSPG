@@ -1,99 +1,80 @@
 <?php
-// Controlador de docentes, se encarga de manejar las peticiones, procesar los datos y delegar la logica al servicio correspodiente
+// Controlador de docentes, se encarga de manejar las peticiones HTTP, procesar los datos y delegar la logica al servicio correspodiente
 
-// vamos a incluir el servicio de docentes para poder llevar la logica del negocio
-require_once __DIR__ . '/../services/DocenteService.php';
+// vamos a incluir el DTO y servicios necesarios para procesar las peticiones
+require_once __DIR__ . '/../dto/DocenteRequestDTO.php';  //DTO para recibir los datos de la solicitudes
+require_once __DIR__ . '/../services/DocenteService.php'; // servicio que contiene la lógica de negocio
 
-class DocenteController {  // creamos la clase docente
+
+class DocenteController {  // creamos la clase controlador de docentes
     private $service;  // esta es una propiedad que guardará una instancia de DocenteService
 
     public function __construct() {
-        // al crear el controlador, instanciamos el servicio de docentes
+        // al instanciar el controlador, instanciamos el servicio de docentes
         $this->service = new DocenteService();
     }
 
     // aca manejamos las peticiones get, post, put, delete. el method es el tip de petición
     // method es el tipo de peticion, id, es el id del docente pero es opcional, data siendo el array de datos recibido en el metodo, opcional
     public function manejar($method, $id = null, $data = null) {
+
+        // Leer JSON del body si no se pasó $data al instanciarnos
+        if (!$data) {
+            $data = json_decode(file_get_contents("php://input"), true);
+        }
+
         switch ($method) {  // se revisa que metodo llego
             case 'GET':  // en get vemos si enviaron un id o no, si lo hacen hago uso de una clase diferente
                 if ($id) {
                     //si nos enviaron un ID, buscamos un docente en especifico
-                    $docente = $this->service->getById($id);
-                    if ($docente) {
-                        // devuelve los datos del docente en json
-                        echo json_encode($docente->toArray());
-                    } else {
-                        // si no se encontro el docente por el id, nos da el error 404
-                        http_response_code(404);
+                     $responseDTO = $this->service->getById((int)$id); // llamada al servicio que develve un DTO
+                    if ($responseDTO) { // si se encontró al docente
+                        echo json_encode($responseDTO->toArray());  // convertimos a JSON y devolvemos
+                    } else { 
+                        http_response_code(404);  // si no se encontró, me da el codigo e eror
                         echo json_encode(['error' => 'Docente no encontrado']);
                     }
-                } else {
-                    // si no se envia id, se obtienen todos los docentes de la tabla
-                    $docentes = $this->service->getAll();
-                    // se convierte cada objeto docente a un array y devuelve un JSON
-                    echo json_encode(array_map(fn($d) => $d->toArray(), $docentes));
+                } else {  // si no nos dan ID, devolvemos todos los docents
+                    $responseDTOs = $this->service->getAll(); // devuelve array de DTOs
+                    echo json_encode(array_map(fn($dto) => $dto->toArray(), $responseDTOs));
                 }
                 break;
             case 'POST':
                 // llama al servicio para crear un nuevo docente con los datos obtenidos
-                $success = $this->service->create($data);
-                echo json_encode(['success' => $success]);
+                $dtoRequest = new DocenteRequestDTO($data);  //creamos un DTO a partir del JSON recibido
+                $responseDTO = $this->service->create($dtoRequest);  // llamamos al servicio para crear
+                echo json_encode($responseDTO->toArray());  // devolvemos la respuesta como json
                 break;
             case 'PUT':
-                // leer el JSON del body si $data aún no se tiene
-                if (!$data) {
-                $data = json_decode(file_get_contents("php://input"), true);
-                }
-
-                // extraer el ID del body
+                // verificamos el ID que viene en el body json
                 $id = $data['id'] ?? null;
-
-                if (!$id) {
-                    // si no nos dan ID, retornamos el error 400
-                    http_response_code(400);
-                    echo json_encode(['error' => 'Se requiere un ID en el body']);
-                exit;
-            }
-            // llamamos al servicio para actualizar el docente
-            $success = $this->service->update($id, $data);
-            // si no se actualizo retornamos el error 404
-                if (!$success) {
-                    http_response_code(404);
-                    echo json_encode(['error' => 'Docente no encontrado o sin cambios']);
-                } else {
-                    // se actualizo sin problemas
-                    echo json_encode(['success' => true]);
-                }
-                break;
-            case 'DELETE':
-                // leemos el json del body si data no fue pasado
-                if (!$data) {
-                    $data = json_decode(file_get_contents("php://input"), true);
-                }
-
-                // se extraeo el ID del body
-                $id = $data['id'] ?? null;
-
-                if (!$id) {
-                    // si no se envia ID, retornamos el error 400
+                if (!$id) {  // si no existe, damos un error
                     http_response_code(400);
                     echo json_encode(['error' => 'Se requiere un ID en el body']);
                     exit;
                 }
-
-                // llamamos al servicio para eliminar el docente
-                $success = $this->service->delete($id);
-                 if (!$success) {
-                    // error por si no se elimino el docente
+                $dtoRequest = new DocenteRequestDTO($data);  // si lo hay, creamos un DTO con los datos recibidos
+                $responseDTO = $this->service->update($dtoRequest);  // llamamos al servicio para actualizar
+                if (!$responseDTO) {  // si no se encontro o no hubo algun cambio
                     http_response_code(404);
-                    echo json_encode(['error' => 'Docente no encontrado']);
+                    echo json_encode(['error' => 'Docente no encontrado o sin cambios']);
                 } else {
-                    echo json_encode(['success' => true]);
+                    echo json_encode($responseDTO->toArray());  // si si lo hubo, mostramos el array con cambios
                 }
                 break;
+            case 'DELETE':
+                // leemos el json del body si data no fue pasado
+                $id = $data['id'] ?? null;
+                if (!$id) {  //si no hay damos error
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Se requiere un ID en el body']);
+                    exit;
+                }
+                $success = $this->service->delete((int)$id); // llamamos al servicio para eliminar
+                echo json_encode(['success' => 'Docente eliminado correctamente']); // mensaje de confirmacion
+                break;
             default:
-                http_response_code(405);
+                http_response_code(405);  // el metodo no esta permitido
                 echo json_encode(['error' => 'Método no permitido']);
         }
     }

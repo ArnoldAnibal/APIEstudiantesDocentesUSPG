@@ -1,40 +1,50 @@
 <?php
 // Service para llevar la Lógica de negocio de docentes, tambien encapsulamos operaciones, reglas, y validaciones antes de ir al repositorio
 
-// incluimos repositorios
+// incluimos repositorios, dtos, y mappers
 require_once __DIR__ . '/../repositories/DocenteRepository.php';
-require_once __DIR__ . '/../models/Docente.php';
+require_once __DIR__ . '/../dto/DocenteRequestDTO.php';
+require_once __DIR__ . '/../dto/DocenteResponseDTO.php';
+require_once __DIR__ . '/../mapper/DocenteMapper.php';
 
 class DocenteService {
     // creamos una propiedad privada que lamacena la instancia del repositorio
-    private $repo;
+    private DocenteRepository $repo;
 
     // constructor que inicializa el repositorio
     public function __construct() {
         $this->repo = new DocenteRepository();  // nueva instancia del repositorio
     }
 
+    // obtener todos los docentes
     public function getAll(): array {
-        return $this->repo->findAll();  // llama al metodo del repositorio para tener todos los registros
+        $docentes = $this->repo->findAll();  // llama al metodo del repositorio para tener todos los registros
+        // convierte cada entidad Docente a ResponseDTO antes de devolverlo
+        return array_map(fn($d) => DocenteMapper::mapEntityToResponseDTO($d), $docentes);// el array docentes tiene todos los objetos Docentes del FindAll. el array map es una funcion de php que aplica una funcion a cada elemento de un array y devuelve un nuevo array con los resultados. el fd($d) es una funcion anonima que recibe un elemento $d del array y lo pasa al mapper para volverlo DTO, y devuelve un array map donce cada objeto Docente se convirtió en un dto
     }
 
-    public function getById($id): ?Docente {
-        return $this->repo->findById($id);  // lama al metodo del repositorio para obtener solo un registro en base a su id
+    // obtener docente por ID
+    public function getById(int $id): ?DocenteResponseDTO {
+        $docente = $this->repo->findById($id);  // llama al metodo repositorio para obtener un regirstro por ID
+        return $docente ? DocenteMapper::mapEntityToResponseDTO($docente) : null;;  // Si existe, lo convierte a un responseDTO si no, devuelve null
     }
 
-    public function create(array $data): bool {
-        // primero transformatos los datos en un objeto Docente
-        $docente = new Docente(null, $data['nombres'], $data['apellidos']);
-        return $this->repo->create($docente);  // llamo al repositorio para insertar el docente en la bd
+    // creamos un nuevo docente, dto son los datos recibidos para la peticion
+    public function create(DocenteRequestDTO $dto): DocenteResponseDTO {
+        // primero transformatos los datos del DTO a un objeto Docente
+        $docente = DocenteMapper::mapRequestDTOToEntity($dto);
+        return $this->repo->create($docente);// llamo al repositorio para insertar el docente en la bd y retornamos el DTO resultante
     }
 
-    public function update($id, array $data): bool {
-        // creamos un nuevo objeto en base a los nuevos datos
-        $docente = new Docente($id, $data['nombres'], $data['apellidos']);
-        return $this->repo->update($docente);  // llamamos al repositorio para actualizar el registro
+    // actualizar el docente, recibe un DTO con los datos recibidos en la peticion, y retorna un DTO acutalizado o null
+    public function update(DocenteRequestDTO $dto): ?DocenteResponseDTO {
+        // creamos un nuevo objeto a partir del DTO y se indica que es actualizacion
+        $docente = DocenteMapper::mapRequestDTOToEntity($dto, true); // true = update
+        return $this->repo->update($docente);  // lamamos al repositorio para actualizar y devolvemos el DTO resultante
     }
 
-    public function delete($id): bool {
+    // eliminamos el docente por ID, recibimos el ID, y retornamos un bool si se elimino
+    public function delete(int $id): bool {
         return $this->repo->delete($id);  // lamamos al repositorio para eliminar el registro
     }
 }

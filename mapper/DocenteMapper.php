@@ -1,31 +1,71 @@
 <?php
-// este archivo Mapper nos ayuda a transformar los datos de la BD que son arrays asociativos a objetos de aplicación
 
-require_once __DIR__ .'/../models/Docente.php';
+// incluimos las calses necesarias como la entidad y ambos DTOs
+require_once __DIR__ . '/../entities/Docente.php';
+require_once __DIR__ . '/../dto/DocenteRequestDTO.php';
+require_once __DIR__ . '/../dto/DocenteResponseDTO.php';
 
+// clase mapper que se encarga de convertir entre DTOs, entity y arrays para la BD
 class DocenteMapper {
-    // Acá vamos a convertir un array asociativo, que es una fila de la BD, en un nuevo objeto
-    // array row es la fila obtenida de la bd con claves id, nombre, y apellidos, return objeto docente
-    public static function mapRowToDocente(array $row): Docente{
-        // acá creamos un objeto Docente usando los datos de la fila
-        return new Docente(
-            $row['id'] ?? null,  // si no hay id, entonces es null
-            $row['nombres'] ?? '', // si no hay nombres, asignamos un string vacio
-            $row['apellidos'] ?? '' // si no hay nombres, asignamos un string vacio
+
+    // Mapea RequestDTO a Entity, el $dto tiene los datos del docente, is update nos dice si es una operacion de actualizacion, y el Docente es que es un objeto listo para insertar o actualizar a la BD
+    public static function mapRequestDTOToEntity(DocenteRequestDTO $dto, bool $isUpdate = false): Docente {
+        $docente = new Docente();  // creamos un nuevo objeto docente
+        if ($isUpdate) {
+            // si es un update, sseteamos la id y los cambios de auditoria 
+            $docente->setId($dto->id);
+            $docente->setUsuarioModificacion("system_apiActualizacion");
+            $docente->setFechaModificacion(date('Y-m-d H:i:s')); // esta es la fecha de ahorita
+        } else {
+            // si es una creacion, seteamos los campos de creacion
+            $docente->setUsuarioCreacion("system_apiCreacion");
+            $docente->setFechaCreacion(date('Y-m-d H:i:s'));  // esta es la fecha de ahorita
+        }
+
+        // asignamos los nombres y apellidos del DTO al objeto entity
+        $docente->setNombres($dto->nombres);
+        $docente->setApellidos($dto->apellidos);
+
+        return $docente;  // retornamos el objeto Entity
+    }
+
+    // Mapea Entity a ResponseDTO es un objeto Docente y un DTO listo para enviar la respuesta
+    public static function mapEntityToResponseDTO(Docente $docente): DocenteResponseDTO {
+        return new DocenteResponseDTO(
+            $docente->getId(),
+            $docente->getNombres(),
+            $docente->getApellidos(),
+            $docente->getUsuarioCreacion(),
+            $docente->getFechaCreacion(),
+            $docente->getUsuarioModificacion(),
+            $docente->getFechaModificacion()
         );
     }
 
+    // mapeo de un registro array de la base de datos a un objeto Docente que es una entity
+    public static function mapRowToEntity(array $row): Docente {
+    return new Docente(
+        $row['id'],
+        $row['nombres'],
+        $row['apellidos'],
+        $row['usuarioCreacion'] ?? '',
+        $row['fechaCreacion'] ?? '',
+        $row['usuarioModificacion'] ?? '',
+        $row['fechaModificacion'] ?? ''
+    );
+}
 
-    // Acá se convierte un objeto Docente en un array asociativo para peticiones SQL como insert o post y update o put
-    // docente $docente es el objeto que vamos a convertir
-    // retornamos un array es el array asociativo conlas claves id, nombres, apellidos
+// mapeamos o convertimos un objeto Docente a un array listo para interaccion con la bd 
 public static function mapDocenteToRow(Docente $docente): array {
     return [
-        'id' => $docente->getId(), // sacamos el id del objeto
+        'id' => $docente->getId(),
         'nombres' => $docente->getNombres(),
-        'apellidos' => $docente->getApellidos()
+        'apellidos' => $docente->getApellidos(),
+        'UsuarioCreacion' => $docente->getUsuarioCreacion(),
+        'FechaCreacion' => $docente->getFechaCreacion(),
+        'UsuarioModificacion' => $docente->getUsuarioModificacion(),
+        'FechaModificacion' => $docente->getFechaModificacion()
     ];
 }
 }
-
 ?>
