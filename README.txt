@@ -30,7 +30,31 @@ README.txt
 
 ## Queries disponibles
 
+## Usuarios
+    POST -> Crear un nuevo usuario
+
+        http://localhost/APIDocente/public/index.php/auth/register 
+        En el body tipo raw
+            {
+            "username": "",
+            "password": "",
+            "nombres": "",
+            "apellidos": ""
+            }
+
+        POST -> Iniciar sesión
+
+        http://localhost/APIDocente/public/index.php/auth/login 
+        En el body tipo raw
+            {
+            "username": "",
+            "password": ""
+            }
+
+            COPIA EL TOKEN QUE TE DA PORQUE SE USARA PARA LAS RUTAS PROTEGIDAS
+
 ### Estudiantes
+EN HEADERS DEBES AGREGAR UN NUEVO LLAMADO 'AUTHORIZATION' Y ESTE DEBE SER 'BEARER TUTOKEN'
     GET -> Lista todos los estudiantes
 
         http://localhost/APIDocente/public/index.php/estudiantes  -> todos los estudiantes
@@ -68,6 +92,9 @@ README.txt
 
 
 ## Docentes
+
+EN HEADERS DEBES AGREGAR UN NUEVO LLAMADO 'AUTHORIZATION' Y ESTE DEBE SER 'BEARER TUTOKEN'
+
     GET -> Lista todos los docentes
 
         http://localhost/APIDocente/public/index.php/docentes  -> todos los docentes

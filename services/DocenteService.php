@@ -30,22 +30,27 @@ class DocenteService {
     }
 
     // creamos un nuevo docente, dto son los datos recibidos para la peticion
-    public function create(DocenteRequestDTO $dto): DocenteResponseDTO {
+    public function create(DocenteRequestDTO $dto, int $currentUserId): DocenteResponseDTO {
         // primero transformatos los datos del DTO a un objeto Docente
-        $docente = DocenteMapper::mapRequestDTOToEntity($dto);
+        $docente = DocenteMapper::mapRequestDTOToEntity($dto, false); // false es creacion
+        $docente->setUsuarioCreacion($currentUserId);  // seteamos quien creo el registro
+        $docente->setFechaCreacion(date('Y-m-d H:i:s')); // fecha y hora actual
         return $this->repo->create($docente);// llamo al repositorio para insertar el docente en la bd y retornamos el DTO resultante
     }
 
     // actualizar el docente, recibe un DTO con los datos recibidos en la peticion, y retorna un DTO acutalizado o null
-    public function update(DocenteRequestDTO $dto): ?DocenteResponseDTO {
+    public function update(DocenteRequestDTO $dto, int $currentUserId): ?DocenteResponseDTO {
         // creamos un nuevo objeto a partir del DTO y se indica que es actualizacion
         $docente = DocenteMapper::mapRequestDTOToEntity($dto, true); // true = update
+        $docente->setUsuarioModificacion($currentUserId); // seteamos quien acutalizo el registro
+        $docente->setFechaModificacion(date('Y-m-d H:i:s')); // fecha y hora actual
         return $this->repo->update($docente);  // lamamos al repositorio para actualizar y devolvemos el DTO resultante
     }
 
     // eliminamos el docente por ID, recibimos el ID, y retornamos un bool si se elimino
     public function delete(int $id): bool {
-        return $this->repo->delete($id);  // lamamos al repositorio para eliminar el registro
+        $deleted = $this->repo->delete($id); // lamamos al repositorio para eliminar el registro
+        return $deleted ? true : false;
     }
 }
 ?>

@@ -13,12 +13,8 @@ class EstudianteMapper {
         if ($isUpdate) {
             // si es un update, sseteamos la id y los cambios de auditoria 
             $estudiante->setId($dto->id);
-            $estudiante->setUsuarioModificacion("system_apiActualizacion");
-            $estudiante->setFechaModificacion(date('Y-m-d H:i:s')); // esta es la fecha de ahorita
-        } else {
-            // si es una creacion, seteamos los campos de creacion
-            $estudiante->setUsuarioCreacion("system_api");
-            $estudiante->setFechaCreacion(date('Y-m-d H:i:s')); // esta es la fecha de ahorita
+            //$estudiante->setUsuarioModificacion("system_apiActualizacion");
+            //$estudiante->setFechaModificacion(date('Y-m-d H:i:s')); // esta es la fecha de ahorita
         }
 
         // asignamos los nombres y apellidos del DTO al objeto entity
@@ -47,9 +43,9 @@ class EstudianteMapper {
         $row['id'],
         $row['nombres'],
         $row['apellidos'],
-        $row['usuarioCreacion'] ?? '',
+        $row['usuario_creacion_username'] ?? null,
         $row['fechaCreacion'] ?? '',
-        $row['usuarioModificacion'] ?? '',
+        $row['usuario_modificacion_username'] ?? null,
         $row['fechaModificacion'] ?? ''
     );
 }

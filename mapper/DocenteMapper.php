@@ -14,12 +14,8 @@ class DocenteMapper {
         if ($isUpdate) {
             // si es un update, sseteamos la id y los cambios de auditoria 
             $docente->setId($dto->id);
-            $docente->setUsuarioModificacion("system_apiActualizacion");
-            $docente->setFechaModificacion(date('Y-m-d H:i:s')); // esta es la fecha de ahorita
-        } else {
-            // si es una creacion, seteamos los campos de creacion
-            $docente->setUsuarioCreacion("system_apiCreacion");
-            $docente->setFechaCreacion(date('Y-m-d H:i:s'));  // esta es la fecha de ahorita
+            //$docente->setUsuarioModificacion("system_apiActualizacion");
+            //$docente->setFechaModificacion(date('Y-m-d H:i:s')); // esta es la fecha de ahorita
         }
 
         // asignamos los nombres y apellidos del DTO al objeto entity
@@ -48,9 +44,9 @@ class DocenteMapper {
         $row['id'],
         $row['nombres'],
         $row['apellidos'],
-        $row['usuarioCreacion'] ?? '',
+        $row['usuario_creacion_username'] ?? null,
         $row['fechaCreacion'] ?? '',
-        $row['usuarioModificacion'] ?? '',
+        $row['usuario_modificacion_username'] ?? null,
         $row['fechaModificacion'] ?? ''
     );
 }

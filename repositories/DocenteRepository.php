@@ -17,9 +17,16 @@ class DocenteRepository {
 
     // metodo parra obtener todos los registros de la bd
     public function findAll(): array {
-        $result = $this->conexion->query("SELECT * FROM docentes");
+        // consulta que trae todos los docentes y sus usuarios de creacion y modificacion
+        $result = $this->conexion->query("SELECT d.*, 
+               uc.username AS usuario_creacion_username, 
+               um.username AS usuario_modificacion_username
+        FROM docentes d
+        LEFT JOIN usuarios uc ON d.UsuarioCreacion = uc.id
+        LEFT JOIN usuarios um ON d.UsuarioModificacion = um.id");
         $docentes = [];
 
+        // manejo de errores en caso de fallo en la consulta
         if (!$result) {
             die("Error en la consulta: " . $this->conexion->error);  // manejo de errores
         }
@@ -33,15 +40,24 @@ class DocenteRepository {
     }
 
     // busca un docente por su ID usando una consulta preparada, si encuentra el registro, lo transforma a un DTO Docente si no, da null
-    public function findById($id): ?DocenteResponseDTO {
-        $stmt = $this->conexion->prepare("SELECT * FROM docentes WHERE id = ?"); // solo preparamos  query
+    public function findById($id): ?Docente {
+        // consulta preparada en contra de sql injection
+        $stmt = $this->conexion->prepare(
+                "SELECT d.*, 
+                        uc.username AS usuario_creacion_username, 
+                        um.username AS usuario_modificacion_username
+                FROM docentes d
+                LEFT JOIN usuarios uc ON d.UsuarioCreacion = uc.id
+                LEFT JOIN usuarios um ON d.UsuarioModificacion = um.id
+                WHERE d.id = ?"
+            ); // solo preparamos  query
         $stmt->bind_param("i", $id);  // asociamos el ID con el parámetro
         $stmt->execute();
         $result = $stmt->get_result();  // obtenemos el resultado
         $row = $result->fetch_assoc();  // tomamos la primer fila
 
         // si existe la fina, devolvemos el DTO si no, mandamos null
-        return $row ? new DocenteResponseDTO($row['id'], $row['nombres'], $row['apellidos']) : null;
+        return $row ? DocenteMapper::mapRowToEntity($row) : null;
     }
 
     // se recibe un objeto docente, lo convierte en DTO con Mapper, y luego lo inserta en la BD para devolver true o false en base a la operación
@@ -69,7 +85,10 @@ class DocenteRepository {
         $stmt->execute();
 
         // retornamos el dto del docente actualizado
-        return $this->findById($data['id']);
+        $updatedDocente = $this->findById($data['id']);
+
+        // mapear a ResponseDTO
+        return DocenteMapper::mapEntityToResponseDTO($updatedDocente);
     }
 
     // eliminar, recibimos un id del docente y devolvemos un bool
