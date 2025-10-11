@@ -33,7 +33,7 @@ README.txt
 ## Usuarios
     POST -> Crear un nuevo usuario
 
-        http://localhost/APIDocente/public/index.php/auth/register 
+        http://localhost/APIDocente/public/index.php/auth/register
         En el body tipo raw
             {
             "username": "",
