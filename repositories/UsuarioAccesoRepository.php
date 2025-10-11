@@ -91,26 +91,79 @@ public function findAll(): array {
 
     // Traer accesos de un usuario
     public function findByUsuarioId(int $usuario_id): array {
-        $stmt = $this->conn->prepare(
-            "SELECT * FROM usuarioacceso WHERE idUsuario = ?"
-        );
-        $stmt->bind_param('i', $usuario_id);
-        $stmt->execute();
-        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    $stmt = $this->conn->prepare("
+        SELECT 
+            idUsuarioAcceso,
+            idUsuario,
+            idRol,
+            idModulo,
+            idAcceso
+        FROM usuarioacceso
+        WHERE idUsuario = ?
+    ");
+    $stmt->bind_param('i', $usuario_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $rows = $result->fetch_all(MYSQLI_ASSOC);
+
+    // Normaliza las claves para que coincidan con el mapper
+    $normalized = [];
+    foreach ($rows as $row) {
+        $normalized[] = [
+            'idUsuarioAcceso' => $row['idUsuarioAcceso'] ?? null,
+            'idUsuario' => $row['idUsuario'] ?? null,
+            'idRol' => $row['idRol'] ?? $row['idrol'] ?? null,
+            'idModulo' => $row['idModulo'] ?? $row['idmodulo'] ?? null,
+            'idAcceso' => $row['idAcceso'] ?? $row['idacceso'] ?? null
+        ];
     }
+
+    return $normalized;
+}
+
 
     // Clonar accesos de un usuario a otro
     public function cloneAccesos(int $usuarioOriginalId, int $nuevoUsuarioId): bool {
-        $accesos = $this->findByUsuarioId($usuarioOriginalId);
-        foreach ($accesos as $acc) {
-            $this->create([
-                'idUsuario' => $nuevoUsuarioId,
-                'idRol' => $acc['idRol'],
-                'idModulo' => $acc['idModulo'],
-                'idAcceso' => $acc['idAcceso']
-            ]);
-        }
-        return true;
+    $accesos = $this->findByUsuarioId($usuarioOriginalId);
+
+    if (empty($accesos)) {
+        throw new Exception("El usuario original ($usuarioOriginalId) no tiene accesos para clonar.");
     }
+
+    foreach ($accesos as $acc) {
+        // Normalizamos los posibles nombres de columnas
+        $idRol = isset($acc['idRol']) ? (int)$acc['idRol'] :
+                 (isset($acc['idrol']) ? (int)$acc['idrol'] : null);
+
+        $idModulo = isset($acc['idModulo']) ? (int)$acc['idModulo'] :
+                    (isset($acc['idmodulo']) ? (int)$acc['idmodulo'] : null);
+
+        $idAcceso = isset($acc['idAcceso']) ? (int)$acc['idAcceso'] :
+                    (isset($acc['idacceso']) ? (int)$acc['idacceso'] : null);
+
+        if ($idRol === null || $idModulo === null || $idAcceso === null) {
+            throw new Exception("Error: el DTO contiene null antes de insertar: " . json_encode([
+                'idUsuario' => $nuevoUsuarioId,
+                'idRol' => $idRol,
+                'idModulo' => $idModulo,
+                'idAcceso' => $idAcceso,
+                'fila_original' => $acc
+            ]));
+        }
+
+        $this->create([
+            'idUsuario' => $nuevoUsuarioId,
+            'idRol' => $idRol,
+            'idModulo' => $idModulo,
+            'idAcceso' => $idAcceso
+        ]);
+    }
+
+    return true;
+}
+
+
+
+
 }
 ?>

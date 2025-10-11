@@ -36,5 +36,29 @@ class UsuarioAccesoService {
     public function delete($id) {
         return $this->repository->delete($id);
     }
+
+    public function cloneAccesos(int $usuarioOriginalId, int $nuevoUsuarioId): bool {
+    $accesosOriginales = $this->repository->findByUsuarioId($usuarioOriginalId);
+
+    foreach ($accesosOriginales as $acceso) {
+        // Normalizar las claves para el RequestDTO
+        $dataDTO = [
+            'id_usuario' => $nuevoUsuarioId,
+            'rol_id' => $acceso['idRol'] ?? $acceso['idrol'] ?? null,
+            'modulo_id' => $acceso['idModulo'] ?? $acceso['idmodulo'] ?? null,
+            'tipoacceso_id' => $acceso['idAcceso'] ?? $acceso['idacceso'] ?? null
+        ];
+
+        $dto = new UsuarioAccesoRequestDTO($dataDTO);
+
+        // Debug opcional
+        // var_dump($dto->toArray());
+
+        $this->repository->create($dto->toArray());
+    }
+
+    return true;
+}
+
 }
 ?>
