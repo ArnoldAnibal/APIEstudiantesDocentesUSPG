@@ -1,34 +1,95 @@
 <?php
-
-//repositorio que maneja la interacción con la tabla de usuarios
-// incluye la conexión a la base de datos y el mapper para convertir entidadesa DTOs
 require_once __DIR__ . '/../connection/db.php';
 require_once __DIR__ . '/../mapper/UsuarioMapper.php';
+require_once __DIR__ . '/../entities/Usuario.php';
 
 class UsuarioRepository {
-    private $conn;  // propiedad para almacenar la conexión a la base de datos
-    public function __construct() { $this->conn = Database::getConnection(); } // constructor que inicializa la conexión
+    private mysqli $conn;
 
-    public function findById($id) {
-        $stmt = $this->conn->prepare('SELECT id, username, nombres, apellidos FROM usuarios WHERE id = ? LIMIT 1');
-        $stmt->bind_param('i',$id);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        return $res->fetch_assoc();  // retorna una fila como un array asociativo
+    public function __construct() {
+        $this->conn = Database::getConnection();
     }
 
-    public function buscarPorUsername($username) {
-        $stmt = $this->conn->prepare('SELECT id, username, password_hash, nombres, apellidos FROM usuarios WHERE username = ? LIMIT 1');
-        $stmt->bind_param('s',$username);
+    /**
+     * Busca un usuario por su ID.
+     */
+    public function findById(int $id): ?array {
+        $stmt = $this->conn->prepare(
+            'SELECT id, username, password_hash, nombres, apellidos, correo, activo 
+             FROM usuarios WHERE id = ? LIMIT 1'
+        );
+        $stmt->bind_param('i', $id);
         $stmt->execute();
+
         $res = $stmt->get_result();
-        return $res->fetch_assoc(); // retorna una fila como un array asociativo
+        $row = $res->fetch_assoc();
+        return $row ?: null;
     }
 
-    public function create($username, $password_hash, $nombres=null, $apellidos=null) {
-        $stmt = $this->conn->prepare('INSERT INTO usuarios (username, password_hash, nombres, apellidos) VALUES (?, ?, ?, ?)');
-        $stmt->bind_param('ssss', $username, $password_hash, $nombres, $apellidos);
+    /**
+     * Busca un usuario por su nombre de usuario.
+     */
+    public function findByUsername(string $username): ?array {
+        $stmt = $this->conn->prepare(
+            'SELECT id, username, password_hash, nombres, apellidos, correo, activo 
+             FROM usuarios WHERE username = ? LIMIT 1'
+        );
+        $stmt->bind_param('s', $username);
         $stmt->execute();
-        return $this->findById($stmt->insert_id);
+
+        $res = $stmt->get_result();
+        $row = $res->fetch_assoc();
+        return $row ?: null;
+    }
+
+    /**
+     * Crea un nuevo usuario con hash de contraseña ya generado.
+     */
+    public function create(
+        string $username,
+        string $password_hash,
+        ?string $nombres = null,
+        ?string $apellidos = null,
+        ?string $correo = null
+    ): UsuarioResponseDTO {
+        $stmt = $this->conn->prepare(
+            'INSERT INTO usuarios (username, password_hash, nombres, apellidos, correo)
+             VALUES (?, ?, ?, ?, ?)'
+        );
+        $stmt->bind_param('sssss', $username, $password_hash, $nombres, $apellidos, $correo);
+
+        if (!$stmt->execute()) {
+            throw new Exception('Error al crear el usuario: ' . $stmt->error);
+        }
+
+        $nuevo = $this->findById($stmt->insert_id);
+        return UsuarioMapper::mapEntityToResponseDTO($nuevo);
+    }
+
+    /**
+     * Clona un usuario existente con nuevos datos.
+     */
+    public function clonarUsuario(Usuario $usuarioClon): UsuarioResponseDTO {
+        $stmt = $this->conn->prepare(
+            'INSERT INTO usuarios (username, password_hash, nombres, apellidos, correo, activo)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        );
+
+        $stmt->bind_param(
+            'sssssi',
+            $usuarioClon->username,
+            $usuarioClon->password_hash,
+            $usuarioClon->nombres,
+            $usuarioClon->apellidos,
+            $usuarioClon->correo,
+            $usuarioClon->activo
+        );
+
+        if (!$stmt->execute()) {
+            throw new Exception('Error al clonar el usuario: ' . $stmt->error);
+        }
+
+        $nuevo = $this->findById($stmt->insert_id);
+        return UsuarioMapper::mapEntityToResponseDTO($nuevo);
     }
 }
