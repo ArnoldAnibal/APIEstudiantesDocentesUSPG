@@ -12,16 +12,20 @@ class DocenteController {  // creamos la clase controlador de docentes
     private $service;  // esta es una propiedad que guardará una instancia de DocenteService
 
 
-    public function __construct() {
+       public function __construct($currentUser) {
         // al instanciar el controlador, instanciamos el servicio de docentes
-        $this->service = new DocenteService();
+        $pais = $currentUser['pais'] ?? 'GT';
+        $this->service = new DocenteService($pais);
     }
 
     // aca manejamos las peticiones get, post, put, delete. el method es el tip de petición
     // method es el tipo de peticion, id, es el id del docente pero es opcional, data siendo el array de datos recibido en el metodo, opcional
     public function manejar($method, $id = null, $data = null) {
 
-        $currentUser = auth_require_user(); // verificamos el token JWT y obtenemos el usuario actual
+        $auth = auth_require_user();
+        $currentUser = $auth['user'];
+        $conn = $auth['conn'];
+
 
         // Leer JSON del body si no se pasó $data al instanciarnos
         if (!$data) {

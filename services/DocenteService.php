@@ -12,8 +12,8 @@ class DocenteService {
     private DocenteRepository $repo;
 
     // constructor que inicializa el repositorio
-    public function __construct() {
-        $this->repo = new DocenteRepository();  // nueva instancia del repositorio
+    public function __construct($pais) {
+        $this->repo = new DocenteRepository($pais);  // nueva instancia del repositorio
     }
 
     // obtener todos los docentes

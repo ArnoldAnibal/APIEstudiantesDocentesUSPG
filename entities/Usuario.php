@@ -13,6 +13,7 @@ class Usuario {
     public $created_at;
     public $updated_at;
     public $accesos = []; // Colección de accesos relacionados
+    public $pais;
 
     public function __construct($data = []) {
         foreach ($data as $key => $value) {
@@ -24,14 +25,15 @@ class Usuario {
      * Clona el usuario actual (Prototype pattern) con nuevos datos.
      * Permite crear un nuevo usuario basado en otro, copiando sus accesos.
      */
-    public function clone(string $nuevoUsername, string $nuevoNombre, string $nuevoApellido, string $nuevoCorreo, string $nuevaContrasena): self {
+    public function clone(string $nuevoUsername, string $nuevoNombre, string $nuevoApellido, string $nuevoCorreo, string $nuevaContrasena, string $nuevoPais): self {
     $clon = new self([
         'username' => $nuevoUsername,
         'password_hash' => password_hash($nuevaContrasena, PASSWORD_DEFAULT),
         'nombres' => $nuevoNombre,
         'apellidos' => $nuevoApellido,
         'correo' => $nuevoCorreo,
-        'activo' => 1
+        'activo' => 1,
+        'pais' => $nuevoPais
     ]);
 
     // Clonar accesos sin copiar el ID

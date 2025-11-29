@@ -5,8 +5,8 @@ require_once __DIR__ . '/../dto/RolResponseDTO.php';
 class RolService {
     private $repository;
 
-    public function __construct() {
-        $this->repository = new RolRepository();
+    public function __construct($pais) {
+        $this->repository = new RolRepository($pais);
     }
 
     public function getAll() {

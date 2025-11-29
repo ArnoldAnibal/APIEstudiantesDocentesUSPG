@@ -1,127 +1,121 @@
 <?php
-// Servicio que maneja la lógica de negocio para usuarios.
-// Interactúa con los repositorios y las entidades.
-
 require_once __DIR__ . '/../repositories/UsuarioRepository.php';
-require_once __DIR__ . '/../entities/UsuarioAcceso.php';
 require_once __DIR__ . '/../repositories/UsuarioAccesoRepository.php';
 require_once __DIR__ . '/../entities/Usuario.php';
+require_once __DIR__ . '/../entities/UsuarioAcceso.php';
+require_once __DIR__ . '/../dto/UsuarioRequestDTO.php';
 require_once __DIR__ . '/../dto/UsuarioAccesoRequestDTO.php';
+require_once __DIR__ . '/../mapper/UsuarioMapper.php';
 
 class UsuarioService {
-    private $repo;        // Repositorio principal de usuarios
-    private $accesoRepo;  // Repositorio de accesos asociados
+    private UsuarioRepository $repo;
+    private UsuarioAccesoRepository $accesoRepo;
+    private string $pais;
 
-    public function __construct() {
-        $this->repo = new UsuarioRepository();
-        $this->accesoRepo = new UsuarioAccesoRepository();
+    public function __construct(string $pais) {
+        $pais = strtoupper($pais);
+        if (!in_array($pais, ['GT','SV','HN'])) {
+            throw new Exception("País no válido. Debe ser GT, SV o HN.");
+        }
+        $this->pais = $pais;
+        $this->repo = new UsuarioRepository($pais);
+        $this->accesoRepo = new UsuarioAccesoRepository($pais); // DB principal
     }
 
-    /**
-     * Registra un nuevo usuario con su contraseña hasheada.
-     */
-    public function register(array $data) {
-        $username = $data['username'] ?? null;
-        $password = $data['password'] ?? null;
-
-        if (!$username || !$password) {
-            throw new Exception('Nombre de usuario y contraseña son requeridos.');
+    public function register(UsuarioRequestDTO $dto): array {
+        $repoPais = new UsuarioRepository($this->pais);
+        if ($repoPais->findByUsername($dto->username)) {
+            throw new Exception("El usuario ya existe en la base de datos de {$this->pais}.");
         }
 
-        // Verificamos si ya existe el username
-        if ($this->repo->findByUsername($username)) {
-            throw new Exception('El nombre de usuario ya existe.');
-        }
+        $hash = password_hash($dto->password, PASSWORD_DEFAULT);
 
-        // Hasheamos la contraseña
-        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $usuarioArray = [
+            'username' => $dto->username,
+            'password_hash' => $hash,
+            'nombres' => $dto->nombres ?? null,
+            'apellidos' => $dto->apellidos ?? null,
+            'correo' => $dto->correo ?? null,
+            'pais' => $this->pais
+        ];
 
-        return $this->repo->create(
-            $username,
-            $hash,
-            $data['nombres'] ?? null,
-            $data['apellidos'] ?? null,
-            $data['correo'] ?? null
-        );
+        return $repoPais->create($usuarioArray);
     }
 
-    /**
-     * Clona un usuario existente y sus accesos.
-     */
-    public function clonar(int $idUsuarioOriginal, array $data) {
-    // 1. Buscar el usuario original
+    public function clonar(int $idUsuarioOriginal, UsuarioRequestDTO $dto) {
     $originalData = $this->repo->findById($idUsuarioOriginal);
-    if (!$originalData) {
-        throw new Exception('Usuario original no encontrado.');
-    }
+    if (!$originalData) throw new Exception("Usuario no existe. ID: $idUsuarioOriginal");
 
-    // 2. Crear entidad Usuario original
     $original = new Usuario($originalData);
 
-    // 3. Traer accesos originales
-    $accesosOriginales = [];
+    // Traer accesos del usuario original
     $accesosBD = $this->accesoRepo->findByUsuarioId($idUsuarioOriginal);
+    $original->accesos = array_map(fn($a) => new UsuarioAcceso(
+        null,
+        $a['idUsuario'],
+        $a['idRol'],
+        $a['idModulo'],
+        $a['idAcceso']
+    ), $accesosBD);
 
-    foreach ($accesosBD as $acc) {
-        if (!$acc['idRol'] || !$acc['idModulo'] || !$acc['idAcceso']) {
-            throw new Exception("El acceso original contiene valores nulos: " . json_encode($acc));
-        }
-        $accesosOriginales[] = new UsuarioAcceso(
-            null,
-            $acc['idUsuario'],
-            $acc['idRol'],
-            $acc['idModulo'],
-            $acc['idAcceso']
-        );
-    }
-
-    $original->accesos = $accesosOriginales;
-
-    // 4. Validar datos del nuevo usuario
-    $campos = ['username','nombres','apellidos','correo','password'];
-    foreach ($campos as $c) {
-        if (empty($data[$c])) {
-            throw new Exception("El campo {$c} es requerido para el nuevo usuario.");
-        }
-    }
-
-    // 5. Crear el clon
+    // Crear clon del usuario
     $clon = $original->clone(
-        $data['username'],
-        $data['nombres'],
-        $data['apellidos'],
-        $data['correo'],
-        $data['password']
+        $dto->username,
+        $dto->nombres,
+        $dto->apellidos,
+        $dto->correo,
+        $dto->password,
+        $this->pais
     );
 
-    // 6. Guardar nuevo usuario
+    // Guardar usuario
     $nuevoUsuario = $this->repo->clonarUsuario($clon);
     $nuevoUsuarioId = is_array($nuevoUsuario) ? $nuevoUsuario['id'] : $nuevoUsuario->id;
 
-    if (!$nuevoUsuarioId) {
-        throw new Exception("No se pudo obtener ID del nuevo usuario.");
-    }
-
-    // 7. Clonar accesos en BD
+    // Clonar accesos si existen
     foreach ($clon->accesos as $acceso) {
-        $dto = new UsuarioAccesoRequestDTO([
-            'id_usuario' => $nuevoUsuarioId,
-            'rol_id' => $acceso->getRolId(),
-            'modulo_id' => $acceso->getModuloId(),
-            'tipoacceso_id' => $acceso->getTipoAccesoId()
+        $this->accesoRepo->create([
+            'idUsuario' => $nuevoUsuarioId,
+            'idRol' => $acceso->getRolId(),
+            'idModulo' => $acceso->getModuloId(),
+            'idAcceso' => $acceso->getTipoAccesoId()
         ]);
-
-        // Validar DTO antes de insertar
-        $arr = $dto->toArray();
-        if (!$arr['idUsuario'] || !$arr['idRol'] || !$arr['idModulo'] || !$arr['idAcceso']) {
-            throw new Exception("Error: el DTO contiene null antes de insertar: " . json_encode($arr));
-        }
-
-        $this->accesoRepo->create($arr);
     }
 
     return $nuevoUsuario;
 }
 
+
+
+
+    public function update(int $id, UsuarioRequestDTO $dto) {
+        $usuarioExistente = $this->repo->findById($id);
+        if (!$usuarioExistente) {
+            throw new Exception("Usuario no encontrado.");
+        }
+
+        $updateData = [
+            'username' => $dto->username ?? $usuarioExistente['username'],
+            'nombres' => $dto->nombres ?? $usuarioExistente['nombres'],
+            'apellidos' => $dto->apellidos ?? $usuarioExistente['apellidos'],
+            'correo' => $dto->correo ?? $usuarioExistente['correo'],
+        ];
+
+        return $this->repo->update($id, $updateData);
+    }
+
+    public function getAll() {
+        return $this->repo->getAll();
+    }
+
+    public function getById(int $id) {
+        $usuario = $this->repo->findById($id);
+        if (!$usuario) throw new Exception("Usuario no encontrado");
+        return $usuario;
+    }
+
+    public function delete(int $id) {
+        return $this->repo->delete($id);
+    }
 }
 ?>

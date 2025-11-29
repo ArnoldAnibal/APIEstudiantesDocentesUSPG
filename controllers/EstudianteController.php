@@ -9,17 +9,21 @@ require_once __DIR__ . '/../dto/EstudianteRequestDTO.php'; // DTO para recibir d
 
 class EstudianteController { // creamos la clase controlador estudiante
     private $service; // esta es una propiedad que guardará una instancia de EstudianteService
+    private $currentUser;
 
-    public function __construct($currentUser) {
-        // al crear el controlador, instanciamos el servicio de estudiante
-        $this->service = new EstudianteService();
-    }
+public function __construct($currentUser) {
+    $this->currentUser = $currentUser;
+    $pais = $currentUser['pais'] ?? 'GT';
+    $this->service = new EstudianteService();
+}
+
 
     // aca manejamos las peticiones get, post, put, delete. el method es el tip de petición
     // method es el tipo de peticion, id, es el id del estudiante pero es opcional, data siendo el array de datos recibido en el metodo, opcional
     public function manejar($method, $id = null, $data = null) {
 
-        $currentUser = auth_require_user();  // verificamos el token JWT y obtenemos el usuario actual
+        $currentUser = $this->currentUser;
+
 
         // si no se proporcionó $data, leeemos el JSON del body de la peticion
         if (!$data) {
@@ -66,15 +70,14 @@ class EstudianteController { // creamos la clase controlador estudiante
                 echo json_encode($response);
                 break;
             case 'PUT':  // actualizar
-                $id = $data['id'] ?? null;  // verificamos que se enviá el ID por el body
+                $id = $data['id'] ?? null;  // verificamos que se envió el ID por el body
                 if (!$id) {  // si no, damos error
                     http_response_code(400);
                     echo json_encode(['error' => 'Se requiere un ID en el body']);
                     exit;
                 }  
                 $dtoRequest = new EstudianteRequestDTO($data); // creamos DTO con los datos recibidos
-                $currentUserId = $currentUser['id'];
-                $responseDTO = $this->service->update($dtoRequest, $currentUserId);  // llamamos al servicio para actualizar
+                $responseDTO = $this->service->update($dtoRequest, (int)$id);  // llamamos al servicio para actualizar con el ID del estudiante
                 if (!$responseDTO) {  // si no se encontró, damos error
                     http_response_code(404);
                     echo json_encode(['message' => 'Estudiante no encontrado o sin cambios',

@@ -1,104 +1,197 @@
 <?php
-// Repositorio que maneja el acceso a datos de los docentes, aca se implementan las capas de acceso a los datos para la entidad Docente. Se encarga de consultar, insertar, actualizar y eliminar los docuemtnes de la base de datos
-
-// se incluye la conexion a la base de datos y la entity y los mapper
-require_once __DIR__ . '/../connection/db.php';
+require_once __DIR__ . '/../connection/DatabaseFactory.php';
 require_once __DIR__ . '/../entities/Docente.php';
 require_once __DIR__ . '/../mapper/DocenteMapper.php';
+require_once __DIR__ . '/../dto/DocenteResponseDTO.php';
 
 class DocenteRepository {
-    // almacenamos la conexion a la base de datos
     private $conexion;
+    private string $pais;
+    private string $dbType; // mysql o pdo
 
-    // constructor que inicia la conexion a la base de datos
-    public function __construct() {
-        $this->conexion = Database::getConnection(); //creamos la conexión
+    public function __construct($pais) {
+        // Repositorio preparado para MySQL, Postgres y SQL Server
+        $this->pais = $pais;
+        $this->conexion = DatabaseFactory::getConnection($pais);
+        $this->dbType = $this->conexion instanceof mysqli ? 'mysql' : 'pdo';
     }
 
-    // metodo parra obtener todos los registros de la bd
     public function findAll(): array {
-        // consulta que trae todos los docentes y sus usuarios de creacion y modificacion
-        $result = $this->conexion->query("SELECT d.*, 
-               uc.username AS usuario_creacion_username, 
-               um.username AS usuario_modificacion_username
-        FROM docentes d
-        LEFT JOIN usuarios uc ON d.UsuarioCreacion = uc.id
-        LEFT JOIN usuarios um ON d.UsuarioModificacion = um.id");
+        if ($this->pais === 'SV') { // Postgres
+            $query = 'SELECT d.*, 
+                           uc.username AS usuario_creacion_username, 
+                           um.username AS usuario_modificacion_username
+                      FROM docentes d
+                      LEFT JOIN usuarios uc ON d."UsuarioCreacion" = uc.id
+                      LEFT JOIN usuarios um ON d."UsuarioModificacion" = um.id';
+        } else { // MySQL y SQL Server
+            $query = 'SELECT d.*, 
+                           uc.username AS usuario_creacion_username, 
+                           um.username AS usuario_modificacion_username
+                      FROM docentes d
+                      LEFT JOIN usuarios uc ON d.UsuarioCreacion = uc.id
+                      LEFT JOIN usuarios um ON d.UsuarioModificacion = um.id';
+        }
+
         $docentes = [];
-
-        // manejo de errores en caso de fallo en la consulta
-        if (!$result) {
-            die("Error en la consulta: " . $this->conexion->error);  // manejo de errores
+        if ($this->dbType === 'mysql') {
+            $result = $this->conexion->query($query);
+            if (!$result) throw new Exception("Error en consulta MySQL: " . $this->conexion->error);
+            while ($row = $result->fetch_assoc()) {
+                $docentes[] = DocenteMapper::mapRowToEntity($row);
+            }
+        } else { // PDO
+            $stmt = $this->conexion->query($query);
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                $row['usuario_creacion_username'] = $row['usuario_creacion_username'] ?? null;
+                $row['usuario_modificacion_username'] = $row['usuario_modificacion_username'] ?? null;
+                $docentes[] = DocenteMapper::mapRowToEntity($row);
+            }
         }
 
-        // se recorre cada fila y se convierte en un objeto docente con el mapper luego se guarda en un array para retornar el arry con todos los docentes
-        while ($row = $result->fetch_assoc()) {
-            $docentes[] = DocenteMapper::mapRowToEntity($row);
-        }
-
-        return $docentes;  // devolvemos el array con todos los docentes
+        return $docentes;
     }
 
-    // busca un docente por su ID usando una consulta preparada, si encuentra el registro, lo transforma a un DTO Docente si no, da null
     public function findById($id): ?Docente {
-        // consulta preparada en contra de sql injection
-        $stmt = $this->conexion->prepare(
-                "SELECT d.*, 
-                        uc.username AS usuario_creacion_username, 
-                        um.username AS usuario_modificacion_username
-                FROM docentes d
-                LEFT JOIN usuarios uc ON d.UsuarioCreacion = uc.id
-                LEFT JOIN usuarios um ON d.UsuarioModificacion = um.id
-                WHERE d.id = ?"
-            ); // solo preparamos  query
-        $stmt->bind_param("i", $id);  // asociamos el ID con el parámetro
-        $stmt->execute();
-        $result = $stmt->get_result();  // obtenemos el resultado
-        $row = $result->fetch_assoc();  // tomamos la primer fila
-
-        // si existe la fina, devolvemos el DTO si no, mandamos null
-        return $row ? DocenteMapper::mapRowToEntity($row) : null;
-    }
-
-    // se recibe un objeto docente, lo convierte en DTO con Mapper, y luego lo inserta en la BD para devolver true o false en base a la operación
-    public function create(Docente $docente): DocenteResponseDTO {
-        $data = DocenteMapper::mapDocenteToRow($docente);  // convertir la entidad en un array
-        $stmt = $this->conexion->prepare("INSERT INTO docentes (nombres, apellidos, UsuarioCreacion, FechaCreacion) VALUES (?, ?, ?, ?)");  // preparamos la consulta
-        $stmt->bind_param("ssss", $data['nombres'], $data['apellidos'], $data['UsuarioCreacion'], $data['FechaCreacion']);
-        if (!$stmt->execute()) {
-        return null; // fallo en la inserción
+        if ($this->pais === 'SV') { // Postgres
+            $query = 'SELECT d.*, 
+                           uc.username AS usuario_creacion_username, 
+                           um.username AS usuario_modificacion_username
+                      FROM docentes d
+                      LEFT JOIN usuarios uc ON d."UsuarioCreacion" = uc.id
+                      LEFT JOIN usuarios um ON d."UsuarioModificacion" = um.id
+                      WHERE d.id = :id';
+        } else { // MySQL y SQL Server
+            $query = 'SELECT d.*, 
+                           uc.username AS usuario_creacion_username, 
+                           um.username AS usuario_modificacion_username
+                      FROM docentes d
+                      LEFT JOIN usuarios uc ON d.UsuarioCreacion = uc.id
+                      LEFT JOIN usuarios um ON d.UsuarioModificacion = um.id
+                      WHERE d.id = ?';
         }
-        
-        // obtenemos el ID generado al objeto
-        $id = $this->conexion->insert_id;
-        
-        // Solo devolvemos un DTO con los campos que queremos en la respuesta
+
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conexion->prepare($query);
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+        } else { // PDO
+            $stmt = $this->conexion->prepare($query);
+            $stmt->execute($this->pais === 'SV' ? [':id' => $id] : [$id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        }
+
+        if (!$row) return null;
+
+        $row['usuario_creacion_username'] = $row['usuario_creacion_username'] ?? null;
+        $row['usuario_modificacion_username'] = $row['usuario_modificacion_username'] ?? null;
+
+        return DocenteMapper::mapRowToEntity($row);
+    }
+
+    public function create(Docente $docente): DocenteResponseDTO {
+        $data = DocenteMapper::mapDocenteToRow($docente);
+        $id = null;
+
+        if ($this->dbType === 'mysql') {
+            // Insercion MySQL con auto increment
+            $stmt = $this->conexion->prepare("INSERT INTO docentes (nombres, apellidos, UsuarioCreacion, FechaCreacion) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssss", $data['nombres'], $data['apellidos'], $data['UsuarioCreacion'], $data['FechaCreacion']);
+            if (!$stmt->execute()) {
+                throw new Exception("Error al crear docente MySQL: " . $stmt->error);
+            }
+            $id = $this->conexion->insert_id;
+        } else { // PDO
+            $driver = $this->conexion->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlsrv') { // SQL Server
+                // OUTPUT para devolver el id generado
+                $query = "INSERT INTO docentes (nombres, apellidos, UsuarioCreacion, FechaCreacion)
+                          OUTPUT INSERTED.id
+                          VALUES (:nombres, :apellidos, :UsuarioCreacion, :FechaCreacion)";
+                $stmt = $this->conexion->prepare($query);
+                $stmt->execute([
+                    ':nombres' => $data['nombres'],
+                    ':apellidos' => $data['apellidos'],
+                    ':UsuarioCreacion' => $data['UsuarioCreacion'],
+                    ':FechaCreacion' => $data['FechaCreacion']
+                ]);
+                $id = (int)$stmt->fetchColumn();
+            } elseif ($driver === 'pgsql') { // Postgres
+                // RETURNING para capturar id en Postgres
+                $query = 'INSERT INTO docentes (nombres, apellidos, "UsuarioCreacion", "FechaCreacion")
+                          VALUES (:nombres, :apellidos, :UsuarioCreacion, :FechaCreacion)
+                          RETURNING id';
+                $stmt = $this->conexion->prepare($query);
+                $stmt->execute([
+                    ':nombres' => $data['nombres'],
+                    ':apellidos' => $data['apellidos'],
+                    ':UsuarioCreacion' => $data['UsuarioCreacion'],
+                    ':FechaCreacion' => $data['FechaCreacion']
+                ]);
+                $id = (int)$stmt->fetchColumn();
+            } else {
+                $query = "INSERT INTO docentes (nombres, apellidos, UsuarioCreacion, FechaCreacion)
+                          VALUES (:nombres, :apellidos, :UsuarioCreacion, :FechaCreacion)";
+                $stmt = $this->conexion->prepare($query);
+                $stmt->execute([
+                    ':nombres' => $data['nombres'],
+                    ':apellidos' => $data['apellidos'],
+                    ':UsuarioCreacion' => $data['UsuarioCreacion'],
+                    ':FechaCreacion' => $data['FechaCreacion']
+                ]);
+                $id = (int)$this->conexion->lastInsertId();
+            }
+        }
+
+        if (!$id) throw new Exception("No se pudo obtener el ID del docente insertado en {$this->pais}");
+
         return new DocenteResponseDTO($id, $data['nombres'], $data['apellidos']);
-
     }
 
-    // se recibe un objeto docente con los datos actualizaos y retornaremos un DTO
     public function update(Docente $docente): DocenteResponseDTO {
-        $data = DocenteMapper::mapDocenteToRow($docente);  // convertimos la entidad en un array
-        $stmt = $this->conexion->prepare("UPDATE docentes SET nombres=?, apellidos=?, UsuarioModificacion=?, FechaModificacion=? WHERE id=?");  // preparamos consulta
-        $stmt->bind_param("ssssi", $data['nombres'], $data['apellidos'], $data['UsuarioModificacion'], $data['FechaModificacion'], $data['id']);
-        $stmt->execute();
+        $data = DocenteMapper::mapDocenteToRow($docente);
+        if ($this->pais === 'SV') { // Postgres
+            $query = 'UPDATE docentes 
+                      SET nombres = :nombres, apellidos = :apellidos, "UsuarioModificacion" = :UsuarioModificacion, "FechaModificacion" = :FechaModificacion
+                      WHERE id = :id';
+            $stmt = $this->conexion->prepare($query);
+            $stmt->execute([
+                ':nombres' => $data['nombres'],
+                ':apellidos' => $data['apellidos'],
+                ':UsuarioModificacion' => $data['UsuarioModificacion'],
+                ':FechaModificacion' => $data['FechaModificacion'],
+                ':id' => $data['id']
+            ]);
+        } elseif ($this->dbType === 'mysql') {
+            $stmt = $this->conexion->prepare("UPDATE docentes SET nombres=?, apellidos=?, UsuarioModificacion=?, FechaModificacion=? WHERE id=?");
+            $stmt->bind_param("ssssi", $data['nombres'], $data['apellidos'], $data['UsuarioModificacion'], $data['FechaModificacion'], $data['id']);
+            $stmt->execute();
+        } else { // SQL Server
+            $stmt = $this->conexion->prepare("UPDATE docentes SET nombres=?, apellidos=?, UsuarioModificacion=?, FechaModificacion=? WHERE id=?");
+            $stmt->execute([$data['nombres'], $data['apellidos'], $data['UsuarioModificacion'], $data['FechaModificacion'], $data['id']]);
+        }
 
-        // retornamos el dto del docente actualizado
         $updatedDocente = $this->findById($data['id']);
-
-        // mapear a ResponseDTO
-        return DocenteMapper::mapEntityToResponseDTO($updatedDocente);
+        return $updatedDocente ? DocenteMapper::mapEntityToResponseDTO($updatedDocente) : null;
     }
 
-    // eliminar, recibimos un id del docente y devolvemos un bool
     public function delete($id): bool {
-        $stmt = $this->conexion->prepare("DELETE FROM docentes WHERE id = ?");
-        $stmt->bind_param("i", $id);  // asociamos el ID con el parámetro
-        $stmt->execute();
-
-        // retornamos true solo si alguna fila fue eliminada
-        return $stmt->affected_rows > 0;
+        if ($this->pais === 'SV') { // Postgres
+            $query = 'DELETE FROM docentes WHERE id = :id';
+            $stmt = $this->conexion->prepare($query);
+            $stmt->execute([':id' => $id]);
+            return $stmt->rowCount() > 0;
+        } elseif ($this->dbType === 'mysql') {
+            $stmt = $this->conexion->prepare("DELETE FROM docentes WHERE id = ?");
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            return $stmt->affected_rows > 0;
+        } else { // SQL Server
+            $stmt = $this->conexion->prepare("DELETE FROM docentes WHERE id = ?");
+            $stmt->execute([$id]);
+            return $stmt->rowCount() > 0;
+        }
     }
 }
 ?>

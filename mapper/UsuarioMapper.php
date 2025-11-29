@@ -19,6 +19,7 @@ class UsuarioMapper {
             'nombres'  => $row['nombres'] ?? null,
             'apellidos'=> $row['apellidos'] ?? null,
             'correo'=> $row['correo'] ?? null,
+            'pais' => $row['pais'] ?? null
         ]);
     }
 }

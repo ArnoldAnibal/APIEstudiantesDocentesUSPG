@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../services/AuthService.php';
+require_once __DIR__ . '/../services/Authservice.php';
 require_once __DIR__ . '/../dto/UsuarioRequestDTO.php';
 
 class AuthController {

@@ -1,64 +1,135 @@
 <?php
-// Simple autenticador JWT que necesita de firebase/php-jwt que se descargo con Composer (vendor/autoload.php).
-require_once __DIR__ . '/../connection/db.php';  // conexión a la bd
-require_once __DIR__ . '/../vendor/autoload.php';  // se incluye el autoload de composer para cargar las librerias, en este caso usamos Firebase JWT
-// importamos las clases de JWT que usaremos para codificar y decodificar tokens
+require_once __DIR__ . '/../vendor/autoload.php';
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-// clave secreta que se usa para firmar y verificar los tokends JWT
-$JWT_SECRET = 'B8AHgIk26d55';
+require_once __DIR__ . '/../connection/DatabaseFactory.php';
+require_once __DIR__ . '/../connection/db_mysql.php';
 
-// Extraemos el token Bearer del header Authorization
-function get_bearer_token() {
-    $headers = null;  // inicializa la variable que contrendrá el header
-    // si exite la variable de servidor HTTP_AUTHORIZATION 
-    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-        $headers = trim($_SERVER['HTTP_AUTHORIZATION']); // le limpiamos los espacios en blanco
-    } else if (function_exists('apache_request_headers')) { // si no existe, intentamos usar apache_request_headers() para obtener todos los headers
-        $req = apache_request_headers();  // obtiene todos los headers
-        if (isset($req['Authorization'])) $headers = trim($req['Authorization']); // tomamos el Authorization token
+$JWT_SECRET = "B8AHgIk26d55";
+
+/**
+ * Normaliza el token desde cualquier servidor (Apache/XAMPP)
+ */
+function get_bearer_token()
+{
+    $headers = [
+        'HTTP_AUTHORIZATION',
+        'Authorization',
+        'REDIRECT_HTTP_AUTHORIZATION'
+    ];
+
+    foreach ($headers as $h) {
+        if (isset($_SERVER[$h])) {
+            return trim(str_replace("Bearer", "", $_SERVER[$h]));
+        }
     }
-    // si no se encontro ningun header, retornamos null
-    if (!$headers) return null;
-    // usamos regex para extraer el token Bearer
-    if (preg_match('/Bearer\s+(\S+)/', $headers, $matches)) {
-        return $matches[1]; // se retorna el token capturado
-    }
-    return null;  // si no hay nada, devolvemos null
+
+    return null;
 }
 
-function auth_require_user() {
-    global $JWT_SECRET, $mysqli;  // accede a la clave secreta y conexion a la db
-    // obtenemos el token del header
+/**
+ * Ejecuta una consulta SELECT en MySQL con mysqli
+ */
+function mysqli_select_one($conn, $query, $param)
+{
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param("i", $param);
+    $stmt->execute();
+    $result = $stmt->get_result();
+
+    return $result->fetch_assoc();
+}
+
+/**
+ * Ejecuta una consulta SELECT para PDO
+ */
+function pdo_select_one($conn, $query, $param)
+{
+    $stmt = $conn->prepare($query);
+    $stmt->execute([$param]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+/**
+ * MIDDLEWARE DE AUTENTICACIÓN
+ */
+function auth_require_user()
+{
+    global $JWT_SECRET;
+
+    // Obtener token del header
     $token = get_bearer_token();
-    if (!$token) { // si no hay token, devolvemos error 401
+    if (!$token) {
         http_response_code(401);
-        echo json_encode(['error' => 'No hay un token de autorización válido.']);
+        echo json_encode(["error" => "Token requerido"]);
         exit;
     }
+
+    // Decodificar token
     try {
-        $decoded = JWT::decode($token, new Key($JWT_SECRET, 'HS256')); // decodifica el token usando la clave secreta y algoritmo HS256
+        $decoded = JWT::decode($token, new Key($JWT_SECRET, "HS256"));
     } catch (Exception $e) {
-        http_response_code(401);  // si hubo error como token invalido, expirado, o alterdao, damos error 401
-        echo json_encode(['error' => 'Token Invalido', 'details' => $e->getMessage()]);
-        exit;
-    }
-    // extraer el ID de usuario del payload del token
-    $userId = $decoded->sub ?? null;
-    if (!$userId) {
         http_response_code(401);
-        echo json_encode(['error' => 'Payload de token Invalido']);
+        echo json_encode(["error" => "Token inválido", "details" => $e->getMessage()]);
         exit;
     }
-    // conectamos a la base de datos
-    $conn = Database::getConnection();
-    //preparamos la consulta SQL para obtener los datos del usuario
-    $stmt = $conn->prepare('SELECT id, username, nombres, apellidos FROM usuarios WHERE id = ? LIMIT 1');
-    $stmt->bind_param('i', $userId); // asociamos el parámetro
-    $stmt->execute(); // ejecutamos la consulta
-    $res = $stmt->get_result(); // obtenemos el resultado
-    $user = $res->fetch_assoc(); //convertimos a array asociativo
-    if (!$user) { http_response_code(401); echo json_encode(['error'=>'Usuario no encontrado']); exit; } // si no se eoncro usuario, damos error 401
-    return $user; // si si se encontró, retornamos los datos del usuario
+
+    // Datos del token
+    $userId = $decoded->id ?? null;
+    $pais   = $decoded->pais ?? null;
+
+    if (!$userId || !$pais) {
+        http_response_code(401);
+        echo json_encode(["error" => "Payload del token inválido"]);
+        exit;
+    }
+
+    // Conexión del país según el token (mysql, pgsql o sqlsrv)
+    try {
+        $conn = DatabaseFactory::getConnection($pais);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(["error" => $e->getMessage()]);
+        exit;
+    }
+
+    // Query según driver
+    if ($conn instanceof mysqli) {
+        $sql = "SELECT id, nombres, apellidos, username, correo, pais 
+                FROM usuarios 
+                WHERE id = ? LIMIT 1";
+        $user = mysqli_select_one($conn, $sql, $userId);
+    } else { // PDO
+        $driver = $conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlsrv') {
+            $sql = "SELECT TOP 1 id, nombres, apellidos, username, correo, pais 
+                    FROM usuarios 
+                    WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$userId]);
+        } else { // pgsql u otros
+            $sql = "SELECT id, nombres, apellidos, username, correo, pais 
+                    FROM usuarios 
+                    WHERE id = ? LIMIT 1";
+            $stmt = $conn->prepare($sql);
+            $stmt->execute([$userId]);
+        }
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
+    if (!$user) {
+        http_response_code(401);
+        echo json_encode(["error" => "Usuario no existe en {$pais}"]);
+        exit;
+    }
+
+    return [
+    'id'        => $user['id'],
+    'nombres'   => $user['nombres'] ?? '',
+    'apellidos' => $user['apellidos'] ?? '',
+    'username'  => $user['username'] ?? '',
+    'pais'      => $user['pais'] ?? $pais
+];
+
 }

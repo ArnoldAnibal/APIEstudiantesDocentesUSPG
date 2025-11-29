@@ -5,8 +5,8 @@ require_once __DIR__ . '/../dto/UsuarioAccesoResponseDTO.php';
 class UsuarioAccesoService {
     private $repository;
 
-    public function __construct() {
-        $this->repository = new UsuarioAccesoRepository();
+    public function __construct($pais) {
+        $this->repository = new UsuarioAccesoRepository($pais);
     }
 
     public function getAll() {

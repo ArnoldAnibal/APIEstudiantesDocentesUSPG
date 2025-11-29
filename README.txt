@@ -90,18 +90,21 @@ Se hace uso de la libreria Firebase por medio de Composer
             "password": "",
             "nombres": "",
             "apellidos": "",
-            "correo": ""
+            "correo": "",
+            "pais": ""
             }
+    SOLO SE ACEPTA COMO PAIS GT, SV o HN
 
     POST -> Iniciar sesión
 
-        http://localhost/APIDocente/public/index.php/auth/login 
+        http://localhost/APIDocente/public/index.php/auth/login
         En el body tipo raw
             {
             "username": "",
-            "password": ""
+            "password": "",
+            "pais": ""
             }
-
+    SOLO SE ACEPTA COMO PAIS GT, SV o HN
             COPIA EL TOKEN QUE TE DA PORQUE SE USARA PARA LAS RUTAS PROTEGIDAS
 
     POTS -> Clonar

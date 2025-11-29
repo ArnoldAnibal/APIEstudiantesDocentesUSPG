@@ -1,9 +1,9 @@
 <?php
 
-require_once __DIR__ . '/../connection/db.php';                // conexión
-require_once __DIR__ . '/../middlewares/AuthMiddleware.php';   // middleware
+require_once __DIR__ . '/../connection/DatabaseFactory.php';
+require_once __DIR__ . '/../middlewares/AuthMiddleware.php';
 
-// incluimos los controladores
+// Controladores
 require_once __DIR__ . '/../controllers/DocenteController.php';
 require_once __DIR__ . '/../controllers/EstudianteController.php';
 require_once __DIR__ . '/../controllers/ModuloController.php';
@@ -11,107 +11,133 @@ require_once __DIR__ . '/../controllers/RolController.php';
 require_once __DIR__ . '/../controllers/TipoAccesoController.php';
 require_once __DIR__ . '/../controllers/UsuarioAccesoController.php';
 
-// obtenemos la URI de la petición y el método
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 $inputData = json_decode(file_get_contents("php://input"), true) ?? [];
 
-// ===========================================================
-// RUTAS PÚBLICAS (sin token): login y register
-// ===========================================================
+/* ===========================================================
+   RUTAS PÚBLICAS (login y register)
+   =========================================================== */
 
-if (preg_match('#^/APIDocente/public/index.php/auth/login$#', $uri)) {
+if (preg_match('#/auth/login$#', $uri)) {
     require_once __DIR__ . '/../controllers/AuthController.php';
     $auth = new AuthController();
 
     if ($method === 'POST') {
         $auth->login($inputData);
-    } else {
-        http_response_code(405);
-        echo json_encode(['error' => 'Método no soportado']);
+        exit;
     }
-    exit;
+    http_response_code(405);
+    exit(json_encode(['error' => 'Método no soportado']));
 }
 
-if (preg_match('#^/APIDocente/public/index.php/auth/register$#', $uri)) {
+if (preg_match('#/auth/register$#', $uri)) {
     require_once __DIR__ . '/../controllers/AuthController.php';
     $auth = new AuthController();
 
     if ($method === 'POST') {
         $auth->register($inputData);
-    } else {
-        http_response_code(405);
-        echo json_encode(['error' => 'Método no soportado']);
+        exit;
     }
+    http_response_code(405);
+    exit(json_encode(['error' => 'Método no soportado']));
+}
+
+/* ===========================================================
+   RUTAS PROTEGIDAS (requieren token)
+   =========================================================== */
+
+$conn = DatabaseFactory::getConnection('GT'); 
+$currentUser = protegerRuta($conn);
+$pais = $currentUser['pais'] ?? 'GT';
+
+/* ===========================================================
+   DOCENTES
+   =========================================================== */
+if (preg_match('#/docentes/?([0-9]*)$#', $uri, $matches)) {
+    $id = $matches[1] !== "" ? (int)$matches[1] : null;
+
+    $controller = new DocenteController($currentUser);
+    $controller->manejar($method, $id, $inputData);
     exit;
 }
 
-// ===========================================================
-// RUTAS PROTEGIDAS (requieren token JWT)
-// ===========================================================
+/* ===========================================================
+   ESTUDIANTES
+   =========================================================== */
+if (preg_match('#/estudiantes/?([0-9]*)$#', $uri, $matches)) {
+    $id = $matches[1] !== "" ? (int)$matches[1] : null;
 
-$conn = Database::getConnection();
-$currentUser = protegerRuta($conn); // valida el token JWT y retorna el usuario
-
-// Inicializamos controladores
-$docenteController = new DocenteController($currentUser);
-$estudianteController = new EstudianteController($currentUser);
-
-// ===========================================================
-// DEFINICIÓN DE RUTAS
-// ===========================================================
-
-// DOCENTES
-if (preg_match('#^/APIDocente/public/index.php/docentes/?([0-9]*)$#', $uri, $matches)) {
-    $id = $matches[1] !== '' ? (int)$matches[1] : null;
-    $docenteController->manejar($method, $id, $inputData);
-
-// ESTUDIANTES
-} elseif (preg_match('#^/APIDocente/public/index.php/estudiantes/?([0-9]*)$#', $uri, $matches)) {
-    $id = $matches[1] !== '' ? (int)$matches[1] : null;
-    $estudianteController->manejar($method, $id, $inputData);
-
-// USUARIOS - CLONAR
-} elseif (preg_match('#^/APIDocente/public/index.php/usuarios/clonar$#', $uri)) {
-    require_once __DIR__ . '/../controllers/UsuarioController.php';
-    $usuarioController = new UsuarioController();
-    $usuarioController->manejar('CLONAR', null, $inputData);
-
-// USUARIOS (REST)
-} elseif (preg_match('#^/APIDocente/public/index.php/usuarios/?([0-9]*)$#', $uri, $matches)) {
-    require_once __DIR__ . '/../controllers/UsuarioController.php';
-    $id = $matches[1] !== '' ? (int)$matches[1] : null;
-    $usuarioController = new UsuarioController();
-    $usuarioController->manejar($method, $id, $inputData);
-
-// MODULOS (REST)
-} elseif (preg_match('#^/APIDocente/public/index.php/modulos/?([0-9]*)$#', $uri, $m)) {
-    $id = $m[1] !== '' ? (int)$m[1] : null;
-    $ctrl = new ModuloController($currentUser);
-    $ctrl->manejar($method, $id, $inputData);
-
-// ROLES (REST)
-} elseif (preg_match('#^/APIDocente/public/index.php/roles/?([0-9]*)$#', $uri, $m)) {
-    $id = $m[1] !== '' ? (int)$m[1] : null;
-    $ctrl = new RolController($currentUser);
-    $ctrl->manejar($method, $id, $inputData);
-
-// TIPO ACCESO (REST)
-} elseif (preg_match('#^/APIDocente/public/index.php/tipoacceso/?([0-9]*)$#', $uri, $m)) {
-    $id = $m[1] !== '' ? (int)$m[1] : null;
-    $ctrl = new TipoAccesoController($currentUser);
-    $ctrl->manejar($method, $id, $inputData);
-
-// USUARIO ACCESO (REST)
-} elseif (preg_match('#^/APIDocente/public/index.php/usuarioacceso/?([0-9]*)$#', $uri, $m)) {
-    $id = $m[1] !== '' ? (int)$m[1] : null;
-    $ctrl = new UsuarioAccesoController($currentUser);
-    $ctrl->manejar($method, $id, $inputData);
-
-// SI NO COINCIDE NINGUNA
-} else {
-    http_response_code(404);
-    echo json_encode(['error' => 'Ruta no encontrada']);
+    $controller = new EstudianteController($currentUser);
+    $controller->manejar($method, $id, $inputData);
+    exit;
 }
+
+/* ===========================================================
+   USUARIOS
+   =========================================================== */
+if (preg_match('#/usuarios/clonar$#', $uri)) {
+    require_once __DIR__ . '/../controllers/UsuarioController.php';
+    $controller = new UsuarioController();
+    $result = $controller->clonar(null, $inputData);
+    echo json_encode($result);
+    exit;
+}
+
+
+if (preg_match('#/usuarios/?([0-9]*)$#', $uri, $matches)) {
+    require_once __DIR__ . '/../controllers/UsuarioController.php';
+    $id = $matches[1] !== "" ? (int)$matches[1] : null;
+    $controller = new UsuarioController();
+    $controller->manejar($method, $id, $inputData);
+    exit;
+}
+
+/* ===========================================================
+   MODULOS
+   =========================================================== */
+if (preg_match('#/modulos/?([0-9]*)$#', $uri, $m)) {
+    $id = $m[1] !== "" ? (int)$m[1] : null;
+    $controller = new ModuloController($currentUser);
+    $controller->manejar($method, $id, $inputData);
+    exit;
+}
+
+/* ===========================================================
+   ROLES
+   =========================================================== */
+if (preg_match('#/roles/?([0-9]*)$#', $uri, $m)) {
+    $id = $m[1] !== "" ? (int)$m[1] : null;
+    $controller = new RolController($currentUser);
+    $controller->manejar($method, $id, $inputData);
+    exit;
+}
+
+/* ===========================================================
+   TIPO ACCESO
+   =========================================================== */
+if (preg_match('#/tipoacceso/?([0-9]*)$#', $uri, $m)) {
+    $id = $m[1] !== "" ? (int)$m[1] : null;
+    $controller = new TipoAccesoController($currentUser);
+    $controller->manejar($method, $id, $inputData);
+    exit;
+}
+
+/* ===========================================================
+   USUARIO ACCESO
+   =========================================================== */
+if (preg_match('#/usuarioacceso/?([0-9]*)$#', $uri, $m)) {
+    $id = $m[1] !== "" ? (int)$m[1] : null;
+    $controller = new UsuarioAccesoController($currentUser);
+    $controller->manejar($method, $id, $inputData);
+    exit;
+}
+
+/* ===========================================================
+   RUTA NO ENCONTRADA
+   =========================================================== */
+http_response_code(404);
+echo json_encode(["error" => "Ruta no encontrada"]);
+exit;
 
 ?>

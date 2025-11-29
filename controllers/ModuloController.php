@@ -6,12 +6,16 @@ require_once __DIR__ . '/../dto/ModuloRequestDTO.php';
 class ModuloController {
     private $service;
 
-    public function __construct() {
-        $this->service = new ModuloService();
+    public function __construct($currentUser) {
+        $pais = $currentUser['pais'] ?? 'GT';
+        $this->service = new ModuloService($pais);
     }
 
     public function manejar($method, $id = null, $data = null) {
-        $currentUser = auth_require_user();
+        $auth = auth_require_user();
+        $currentUser = $auth['user'];
+        $conn = $auth['conn'];
+
 
         if (!$data) {
             $data = json_decode(file_get_contents("php://input"), true);

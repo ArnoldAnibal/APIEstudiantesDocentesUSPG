@@ -7,11 +7,15 @@ class TipoAccesoController {
     private $service;
 
     public function __construct($currentUser) {
-        $this->service = new TipoAccesoService();
+        $pais = $currentUser['pais'] ?? 'GT';
+        $this->service = new TipoAccesoService($pais);
     }
 
     public function manejar($method, $id = null, $data = null) {
-        $currentUser = auth_require_user();
+        $auth = auth_require_user();
+        $currentUser = $auth['user'];
+        $conn = $auth['conn'];
+
         if (!$data) $data = json_decode(file_get_contents("php://input"), true);
 
         switch ($method) {

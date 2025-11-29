@@ -1,169 +1,116 @@
 <?php
-require_once __DIR__ . '/../connection/db.php';
+require_once __DIR__ . '/../connection/DatabaseFactory.php';
 require_once __DIR__ . '/../dto/UsuarioAccesoResponseDTO.php';
 require_once __DIR__ . '/../mapper/UsuarioAccesoMapper.php';
 
 class UsuarioAccesoRepository {
-    private mysqli $conn;
+    private $conn;
+    private $dbType;
 
-    public function __construct() {
-        $this->conn = Database::getConnection();
+    public function __construct($pais) {
+        $this->conn = DatabaseFactory::getConnection($pais);
+
+        // Detectamos tipo de conexión
+        if ($this->conn instanceof mysqli) $this->dbType = 'mysql';
+        else $this->dbType = 'pdo';
     }
 
-    // Traer todos los registros
-    // Traer todos los registros
-public function findAll(): array {
-    $res = $this->conn->query("SELECT * FROM usuarioacceso");
-    $rows = $res->fetch_all(MYSQLI_ASSOC);
-    $response = [];
-
-    foreach ($rows as $row) {
-        $dto = UsuarioAccesoMapper::mapRowToResponseDTO($row); // DTO, no array
-        $response[] = $dto; 
-    }
-
-    return $response; // Devuelve array de DTOs
-}
-
-
-
-    // Traer por ID
-    public function findById(int $id): ?array {
-        $stmt = $this->conn->prepare("SELECT * FROM usuarioacceso WHERE idUsuarioAcceso = ?");
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        return $row ?: null;
-    }
-
-    // Crear un acceso nuevo
     public function create(array $data): array {
-        $stmt = $this->conn->prepare(
-            "INSERT INTO usuarioacceso (idUsuario, idRol, idModulo, idAcceso) VALUES (?,?,?,?)"
-        );
-        $stmt->bind_param(
-            'iiii',
-            $data['idUsuario'],
-            $data['idRol'],
-            $data['idModulo'],
-            $data['idAcceso']
-        );
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare(
+                "INSERT INTO usuarioacceso (idUsuario, idRol, idModulo, idAcceso) VALUES (?,?,?,?)"
+            );
+            $stmt->bind_param('iiii',
+                $data['idUsuario'],
+                $data['idRol'],
+                $data['idModulo'],
+                $data['idAcceso']
+            );
+            if (!$stmt->execute()) throw new Exception("Error al crear usuario acceso: ".$stmt->error);
+            $insertId = $this->conn->insert_id;
 
-        if (!$stmt->execute()) {
-            throw new Exception("Error al crear usuario acceso: " . $stmt->error);
+        } else {
+            $driver = $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+            if ($driver === 'pgsql') {
+                $sql = "INSERT INTO usuarioacceso (idUsuario, idRol, idModulo, idAcceso) 
+                        VALUES (:idUsuario, :idRol, :idModulo, :idAcceso) RETURNING idUsuarioAcceso";
+                $stmt = $this->conn->prepare($sql);
+                $stmt->execute([
+                    ':idUsuario' => $data['idUsuario'],
+                    ':idRol' => $data['idRol'],
+                    ':idModulo' => $data['idModulo'],
+                    ':idAcceso' => $data['idAcceso']
+                ]);
+                $insertId = $stmt->fetchColumn();
+
+            } elseif ($driver === 'sqlsrv') {
+                // SQL Server: insert + obtener SCOPE_IDENTITY() en una query separada
+                $sqlInsert = "INSERT INTO usuarioacceso (idUsuario, idRol, idModulo, idAcceso)
+                              VALUES (:idUsuario, :idRol, :idModulo, :idAcceso)";
+                $stmt = $this->conn->prepare($sqlInsert);
+                $stmt->execute([
+                    ':idUsuario' => $data['idUsuario'],
+                    ':idRol' => $data['idRol'],
+                    ':idModulo' => $data['idModulo'],
+                    ':idAcceso' => $data['idAcceso']
+                ]);
+
+                // Segundo query para obtener el último ID insertado
+                $insertIdRow = $this->conn->query("SELECT CAST(SCOPE_IDENTITY() AS INT) AS idUsuarioAcceso")
+                                          ->fetch(PDO::FETCH_ASSOC);
+                $insertId = $insertIdRow['idUsuarioAcceso'] ?? null;
+
+                if ($insertId === null) {
+                    throw new Exception("No se pudo obtener el ID del usuario acceso insertado en SQL Server");
+                }
+
+            } else {
+                throw new Exception("Driver PDO no soportado: $driver");
+            }
         }
 
-        return $this->findById($stmt->insert_id);
+        return $this->findById((int)$insertId);
     }
 
-    // Actualizar un acceso
-    public function update(int $id, array $data): ?array {
-        $stmt = $this->conn->prepare(
-            "UPDATE usuarioacceso SET idUsuario=?, idRol=?, idModulo=?, idAcceso=? WHERE idUsuarioAcceso=?"
-        );
-        $stmt->bind_param(
-            'iiiii',
-            $data['idUsuario'],
-            $data['idRol'],
-            $data['idModulo'],
-            $data['idAcceso'],
-            $id
-        );
+    public function findById(int $id): ?array {
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare("SELECT * FROM usuarioacceso WHERE idUsuarioAcceso=?");
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            return $row ?: null;
+        } else {
+            $stmt = $this->conn->prepare("SELECT * FROM usuarioacceso WHERE idUsuarioAcceso=:id");
+            $stmt->execute([':id' => $id]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        }
+    }
 
-        if (!$stmt->execute()) {
-            throw new Exception("Error al actualizar usuario acceso: " . $stmt->error);
+    public function findByUsuarioId(int $usuarioId): array {
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare("SELECT * FROM usuarioacceso WHERE idUsuario=?");
+            $stmt->bind_param('i', $usuarioId);
+            $stmt->execute();
+            $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+        } else {
+            $stmt = $this->conn->prepare("SELECT * FROM usuarioacceso WHERE idUsuario=:idUsuario");
+            $stmt->execute([':idUsuario' => $usuarioId]);
+            $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        return $this->findById($id);
-    }
-
-    // Eliminar un acceso
-    public function delete(int $id): bool {
-        $stmt = $this->conn->prepare("DELETE FROM usuarioacceso WHERE idUsuarioAcceso=?");
-        $stmt->bind_param('i', $id);
-
-        if (!$stmt->execute()) {
-            throw new Exception("Error al eliminar usuario acceso: " . $stmt->error);
+        $normalized = [];
+        foreach ($rows as $row) {
+            $normalized[] = [
+                'idUsuarioAcceso' => $row['idUsuarioAcceso'] ?? null,
+                'idUsuario' => $row['idUsuario'] ?? null,
+                'idRol' => $row['idRol'] ?? $row['idrol'] ?? null,
+                'idModulo' => $row['idModulo'] ?? $row['idmodulo'] ?? null,
+                'idAcceso' => $row['idAcceso'] ?? $row['idacceso'] ?? null
+            ];
         }
-
-        return $stmt->affected_rows > 0;
+        return $normalized;
     }
-
-    // Traer accesos de un usuario
-    public function findByUsuarioId(int $usuario_id): array {
-    $stmt = $this->conn->prepare("
-        SELECT 
-            idUsuarioAcceso,
-            idUsuario,
-            idRol,
-            idModulo,
-            idAcceso
-        FROM usuarioacceso
-        WHERE idUsuario = ?
-    ");
-    $stmt->bind_param('i', $usuario_id);
-    $stmt->execute();
-    $result = $stmt->get_result();
-    $rows = $result->fetch_all(MYSQLI_ASSOC);
-
-    // Normaliza las claves para que coincidan con el mapper
-    $normalized = [];
-    foreach ($rows as $row) {
-        $normalized[] = [
-            'idUsuarioAcceso' => $row['idUsuarioAcceso'] ?? null,
-            'idUsuario' => $row['idUsuario'] ?? null,
-            'idRol' => $row['idRol'] ?? $row['idrol'] ?? null,
-            'idModulo' => $row['idModulo'] ?? $row['idmodulo'] ?? null,
-            'idAcceso' => $row['idAcceso'] ?? $row['idacceso'] ?? null
-        ];
-    }
-
-    return $normalized;
-}
-
-
-    // Clonar accesos de un usuario a otro
-    public function cloneAccesos(int $usuarioOriginalId, int $nuevoUsuarioId): bool {
-    $accesos = $this->findByUsuarioId($usuarioOriginalId);
-
-    if (empty($accesos)) {
-        throw new Exception("El usuario original ($usuarioOriginalId) no tiene accesos para clonar.");
-    }
-
-    foreach ($accesos as $acc) {
-        // Normalizamos los posibles nombres de columnas
-        $idRol = isset($acc['idRol']) ? (int)$acc['idRol'] :
-                 (isset($acc['idrol']) ? (int)$acc['idrol'] : null);
-
-        $idModulo = isset($acc['idModulo']) ? (int)$acc['idModulo'] :
-                    (isset($acc['idmodulo']) ? (int)$acc['idmodulo'] : null);
-
-        $idAcceso = isset($acc['idAcceso']) ? (int)$acc['idAcceso'] :
-                    (isset($acc['idacceso']) ? (int)$acc['idacceso'] : null);
-
-        if ($idRol === null || $idModulo === null || $idAcceso === null) {
-            throw new Exception("Error: el DTO contiene null antes de insertar: " . json_encode([
-                'idUsuario' => $nuevoUsuarioId,
-                'idRol' => $idRol,
-                'idModulo' => $idModulo,
-                'idAcceso' => $idAcceso,
-                'fila_original' => $acc
-            ]));
-        }
-
-        $this->create([
-            'idUsuario' => $nuevoUsuarioId,
-            'idRol' => $idRol,
-            'idModulo' => $idModulo,
-            'idAcceso' => $idAcceso
-        ]);
-    }
-
-    return true;
-}
-
-
-
-
 }
 ?>

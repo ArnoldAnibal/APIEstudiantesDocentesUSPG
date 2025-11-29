@@ -7,8 +7,8 @@ require_once __DIR__ . '/../dto/ModuloResponseDTO.php';
 class ModuloService {
     private $repository;
 
-    public function __construct() {
-        $this->repository = new ModuloRepository();
+    public function __construct($pais) {
+        $this->repository = new ModuloRepository($pais);
     }
 
     public function getAll(): array {

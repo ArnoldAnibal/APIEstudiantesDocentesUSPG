@@ -1,0 +1,465 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>APIDocente UI</title>
+  <style>
+    :root {
+      --bg: #0b1021;
+      --panel: #121931;
+      --accent: #5bd1b8;
+      --accent-2: #8bc3ff;
+      --text: #e8edf7;
+      --muted: #9aa6c2;
+      --border: #1f2b4d;
+      --error: #ff6b6b;
+      --success: #5bd1b8;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 20% 20%, #132044, transparent 30%),
+                  radial-gradient(circle at 80% 0%, #12323d, transparent 35%),
+                  linear-gradient(135deg, #0b1021 0%, #0e1327 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+    }
+    .shell {
+      width: min(1200px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 24px;
+      letter-spacing: 0.3px;
+    }
+    p { color: var(--muted); margin-top: 0; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin: 16px 0;
+    }
+    .card {
+      background: #0f1730;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+    }
+    label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--muted); }
+    input, select, textarea {
+      width: 100%;
+      background: #0c1226;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    textarea { resize: vertical; min-height: 120px; }
+    button {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #0a1022;
+      border: none;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.08s ease, box-shadow 0.2s ease;
+    }
+    button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(0,0,0,0.25); }
+    button.secondary { background: #0c1226; color: var(--text); border: 1px solid var(--border); }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row button { flex: 1; min-width: 120px; }
+    pre {
+      background: #0b1021;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      color: var(--text);
+      overflow: auto;
+      max-height: 360px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .pill { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #0c1226; border: 1px solid var(--border); color: var(--muted); font-size: 12px; margin-left: 8px; }
+    .status { font-weight: 700; }
+    .status.ok { color: var(--success); }
+    .status.err { color: var(--error); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>APIDocente Playground <span class="pill" id="conn-pill">GT</span></h1>
+    <p>Autentica y ejecuta llamadas a estudiantes. Ajusta la API base si cambias puerto o host.</p>
+
+    <div class="grid">
+      <div class="card">
+        <label for="apiBase">API Base</label>
+        <input id="apiBase" value="/APIDocente/public/index.php" />
+        <label for="pais">País (token)</label>
+        <select id="pais">
+          <option value="GT">GT (MySQL)</option>
+          <option value="SV">SV (Postgres)</option>
+          <option value="HN" selected>HN (SQL Server)</option>
+        </select>
+        <label for="username">Usuario</label>
+        <input id="username" value="usuarioPais1" />
+        <label for="password">Password</label>
+        <input id="password" type="password" value="" />
+        <button id="loginBtn">Obtener token</button>
+        <p id="tokenStatus" class="status err">No autenticado</p>
+      </div>
+
+      <div class="card">
+        <!-- Seccion estudiantes -->
+        <h3>Estudiantes</h3>
+        <label for="studentId">ID Estudiante</label>
+        <input id="studentId" placeholder="ej. 35" />
+        <label for="studentNombre">Nombres</label>
+        <input id="studentNombre" placeholder="Nombre" />
+        <label for="studentApellido">Apellidos</label>
+        <input id="studentApellido" placeholder="Apellido" />
+        <div class="row">
+          <button id="getAllBtn" class="secondary">GET todos</button>
+          <button id="getOneBtn" class="secondary">GET uno</button>
+        </div>
+        <div class="row">
+          <button id="createBtn">POST crear</button>
+          <button id="updateBtn">PUT actualizar</button>
+          <button id="deleteBtn" class="secondary">DELETE</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <!-- Seccion docentes -->
+        <h3>Docentes</h3>
+        <label for="docId">ID Docente</label>
+        <input id="docId" placeholder="ej. 10" />
+        <label for="docNombre">Nombres</label>
+        <input id="docNombre" placeholder="Nombre" />
+        <label for="docApellido">Apellidos</label>
+        <input id="docApellido" placeholder="Apellido" />
+        <div class="row">
+          <button id="docGetAll" class="secondary">GET todos</button>
+          <button id="docGetOne" class="secondary">GET uno</button>
+        </div>
+        <div class="row">
+          <button id="docCreate">POST crear</button>
+          <button id="docUpdate">PUT actualizar</button>
+          <button id="docDelete" class="secondary">DELETE</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <!-- Seccion modulos -->
+        <h3>Modulos</h3>
+        <label for="modId">ID Módulo</label>
+        <input id="modId" placeholder="ej. 3" />
+        <label for="modNombre">Nombre</label>
+        <input id="modNombre" placeholder="Nombre del módulo" />
+        <div class="row">
+          <button id="modGetAll" class="secondary">GET todos</button>
+          <button id="modGetOne" class="secondary">GET uno</button>
+        </div>
+        <div class="row">
+          <button id="modCreate">POST crear</button>
+          <button id="modUpdate">PUT actualizar</button>
+          <button id="modDelete" class="secondary">DELETE</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <!-- Seccion roles -->
+        <h3>Roles</h3>
+        <label for="rolId">ID Rol</label>
+        <input id="rolId" placeholder="ej. 2" />
+        <label for="rolNombre">Nombre</label>
+        <input id="rolNombre" placeholder="Nombre del rol" />
+        <div class="row">
+          <button id="rolGetAll" class="secondary">GET todos</button>
+          <button id="rolGetOne" class="secondary">GET uno</button>
+        </div>
+        <div class="row">
+          <button id="rolCreate">POST crear</button>
+          <button id="rolUpdate">PUT actualizar</button>
+          <button id="rolDelete" class="secondary">DELETE</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <!-- Seccion tipo de acceso -->
+        <h3>Tipo Acceso</h3>
+        <label for="tipoId">ID Tipo</label>
+        <input id="tipoId" placeholder="ej. 4" />
+        <label for="tipoNombre">Nombre</label>
+        <input id="tipoNombre" placeholder="Nombre del tipo de acceso" />
+        <div class="row">
+          <button id="tipoGetAll" class="secondary">GET todos</button>
+          <button id="tipoGetOne" class="secondary">GET uno</button>
+        </div>
+        <div class="row">
+          <button id="tipoCreate">POST crear</button>
+          <button id="tipoUpdate">PUT actualizar</button>
+          <button id="tipoDelete" class="secondary">DELETE</button>
+        </div>
+      </div>
+
+      <div class="card" style="grid-column: 1 / -1;">
+        <div class="row" style="margin-bottom:8px; align-items:center;">
+          <strong style="flex:1;">Request / Response</strong>
+          <button id="clearBtn" class="secondary" style="flex:0 0 auto;">Limpiar</button>
+        </div>
+        <pre id="log"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const apiBaseInput = document.getElementById('apiBase');
+    const paisSelect = document.getElementById('pais');
+    const userInput = document.getElementById('username');
+    const passInput = document.getElementById('password');
+    const tokenStatus = document.getElementById('tokenStatus');
+    const connPill = document.getElementById('conn-pill');
+    const logEl = document.getElementById('log');
+
+    const studentId = document.getElementById('studentId');
+    const studentNombre = document.getElementById('studentNombre');
+    const studentApellido = document.getElementById('studentApellido');
+
+    const docId = document.getElementById('docId');
+    const docNombre = document.getElementById('docNombre');
+    const docApellido = document.getElementById('docApellido');
+
+    const modId = document.getElementById('modId');
+    const modNombre = document.getElementById('modNombre');
+
+    const rolId = document.getElementById('rolId');
+    const rolNombre = document.getElementById('rolNombre');
+
+    const tipoId = document.getElementById('tipoId');
+    const tipoNombre = document.getElementById('tipoNombre');
+
+    let token = null;
+
+    function log(title, payload, isError = false) {
+      const time = new Date().toLocaleTimeString();
+      const entry = `[${time}] ${title}\n${JSON.stringify(payload, null, 2)}\n\n`;
+      logEl.textContent = entry + logEl.textContent;
+      if (isError) {
+        tokenStatus.classList.remove('ok');
+        tokenStatus.classList.add('err');
+      }
+    }
+
+    function headers() {
+      return token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' };
+    }
+
+    async function doFetch(path, options = {}) {
+      const url = apiBaseInput.value.replace(/\/$/, '') + path;
+      const resp = await fetch(url, { ...options, headers: { ...(headers()), ...(options.headers || {}) } });
+      let body = null;
+      try { body = await resp.json(); } catch (_) { body = await resp.text(); }
+      if (!resp.ok) throw { status: resp.status, body };
+      return body;
+    }
+
+    document.getElementById('loginBtn').onclick = async () => {
+      const payload = { username: userInput.value, password: passInput.value, pais: paisSelect.value };
+      try {
+        const data = await doFetch('/auth/login', { method: 'POST', body: JSON.stringify(payload) });
+        token = data.token;
+        tokenStatus.textContent = `OK • ${data.usuario?.username || ''}`;
+        tokenStatus.classList.remove('err');
+        tokenStatus.classList.add('ok');
+        connPill.textContent = paisSelect.value;
+        log('Login OK', data);
+      } catch (err) {
+        token = null;
+        tokenStatus.textContent = 'No autenticado';
+        tokenStatus.classList.add('err');
+        log('Login error', err, true);
+      }
+    };
+
+    document.getElementById('getAllBtn').onclick = async () => {
+      try {
+        const data = await doFetch('/estudiantes');
+        log('GET /estudiantes', data);
+      } catch (err) { log('GET /estudiantes error', err, true); }
+    };
+
+    document.getElementById('getOneBtn').onclick = async () => {
+      if (!studentId.value) return alert('Ingresa ID');
+      try {
+        const data = await doFetch(`/estudiantes/${studentId.value}`);
+        log(`GET /estudiantes/${studentId.value}`, data);
+      } catch (err) { log('GET uno error', err, true); }
+    };
+
+    document.getElementById('createBtn').onclick = async () => {
+      try {
+        const payload = { nombres: studentNombre.value, apellidos: studentApellido.value };
+        const data = await doFetch('/estudiantes', { method: 'POST', body: JSON.stringify(payload) });
+        log('POST /estudiantes', data);
+      } catch (err) { log('POST error', err, true); }
+    };
+
+    document.getElementById('updateBtn').onclick = async () => {
+      if (!studentId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(studentId.value, 10), nombres: studentNombre.value, apellidos: studentApellido.value };
+        const data = await doFetch('/estudiantes', { method: 'PUT', body: JSON.stringify(payload) });
+        log('PUT /estudiantes', data);
+      } catch (err) { log('PUT error', err, true); }
+    };
+
+    document.getElementById('deleteBtn').onclick = async () => {
+      if (!studentId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(studentId.value, 10) };
+        const data = await doFetch('/estudiantes', { method: 'DELETE', body: JSON.stringify(payload) });
+        log('DELETE /estudiantes', data);
+      } catch (err) { log('DELETE error', err, true); }
+    };
+
+    document.getElementById('clearBtn').onclick = () => { logEl.textContent = ''; };
+
+    // Docentes
+    document.getElementById('docGetAll').onclick = async () => {
+      try { log('GET /docentes', await doFetch('/docentes')); }
+      catch (err) { log('GET /docentes error', err, true); }
+    };
+    document.getElementById('docGetOne').onclick = async () => {
+      if (!docId.value) return alert('Ingresa ID');
+      try { log(`GET /docentes/${docId.value}`, await doFetch(`/docentes/${docId.value}`)); }
+      catch (err) { log('GET uno docente error', err, true); }
+    };
+    document.getElementById('docCreate').onclick = async () => {
+      try {
+        const payload = { nombres: docNombre.value, apellidos: docApellido.value };
+        log('POST /docentes', await doFetch('/docentes', { method: 'POST', body: JSON.stringify(payload) }));
+      } catch (err) { log('POST docente error', err, true); }
+    };
+    document.getElementById('docUpdate').onclick = async () => {
+      if (!docId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(docId.value, 10), nombres: docNombre.value, apellidos: docApellido.value };
+        log('PUT /docentes', await doFetch('/docentes', { method: 'PUT', body: JSON.stringify(payload) }));
+      } catch (err) { log('PUT docente error', err, true); }
+    };
+    document.getElementById('docDelete').onclick = async () => {
+      if (!docId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(docId.value, 10) };
+        log('DELETE /docentes', await doFetch('/docentes', { method: 'DELETE', body: JSON.stringify(payload) }));
+      } catch (err) { log('DELETE docente error', err, true); }
+    };
+
+    // Modulos
+    document.getElementById('modGetAll').onclick = async () => {
+      try { log('GET /modulos', await doFetch('/modulos')); }
+      catch (err) { log('GET /modulos error', err, true); }
+    };
+    document.getElementById('modGetOne').onclick = async () => {
+      if (!modId.value) return alert('Ingresa ID');
+      try { log(`GET /modulos/${modId.value}`, await doFetch(`/modulos/${modId.value}`)); }
+      catch (err) { log('GET uno modulo error', err, true); }
+    };
+    document.getElementById('modCreate').onclick = async () => {
+      try {
+        const payload = { nombre: modNombre.value };
+        log('POST /modulos', await doFetch('/modulos', { method: 'POST', body: JSON.stringify(payload) }));
+      } catch (err) { log('POST modulo error', err, true); }
+    };
+    document.getElementById('modUpdate').onclick = async () => {
+      if (!modId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(modId.value, 10), nombre: modNombre.value };
+        log('PUT /modulos', await doFetch('/modulos', { method: 'PUT', body: JSON.stringify(payload) }));
+      } catch (err) { log('PUT modulo error', err, true); }
+    };
+    document.getElementById('modDelete').onclick = async () => {
+      if (!modId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(modId.value, 10) };
+        log('DELETE /modulos', await doFetch('/modulos', { method: 'DELETE', body: JSON.stringify(payload) }));
+      } catch (err) { log('DELETE modulo error', err, true); }
+    };
+
+    // Roles
+    document.getElementById('rolGetAll').onclick = async () => {
+      try { log('GET /roles', await doFetch('/roles')); }
+      catch (err) { log('GET /roles error', err, true); }
+    };
+    document.getElementById('rolGetOne').onclick = async () => {
+      if (!rolId.value) return alert('Ingresa ID');
+      try { log(`GET /roles/${rolId.value}`, await doFetch(`/roles/${rolId.value}`)); }
+      catch (err) { log('GET uno rol error', err, true); }
+    };
+    document.getElementById('rolCreate').onclick = async () => {
+      try {
+        const payload = { nombre: rolNombre.value };
+        log('POST /roles', await doFetch('/roles', { method: 'POST', body: JSON.stringify(payload) }));
+      } catch (err) { log('POST rol error', err, true); }
+    };
+    document.getElementById('rolUpdate').onclick = async () => {
+      if (!rolId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(rolId.value, 10), nombre: rolNombre.value };
+        log('PUT /roles', await doFetch('/roles', { method: 'PUT', body: JSON.stringify(payload) }));
+      } catch (err) { log('PUT rol error', err, true); }
+    };
+    document.getElementById('rolDelete').onclick = async () => {
+      if (!rolId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(rolId.value, 10) };
+        log('DELETE /roles', await doFetch('/roles', { method: 'DELETE', body: JSON.stringify(payload) }));
+      } catch (err) { log('DELETE rol error', err, true); }
+    };
+
+    // Tipo acceso
+    document.getElementById('tipoGetAll').onclick = async () => {
+      try { log('GET /tipoacceso', await doFetch('/tipoacceso')); }
+      catch (err) { log('GET /tipoacceso error', err, true); }
+    };
+    document.getElementById('tipoGetOne').onclick = async () => {
+      if (!tipoId.value) return alert('Ingresa ID');
+      try { log(`GET /tipoacceso/${tipoId.value}`, await doFetch(`/tipoacceso/${tipoId.value}`)); }
+      catch (err) { log('GET uno tipoacceso error', err, true); }
+    };
+    document.getElementById('tipoCreate').onclick = async () => {
+      try {
+        const payload = { nombre: tipoNombre.value };
+        log('POST /tipoacceso', await doFetch('/tipoacceso', { method: 'POST', body: JSON.stringify(payload) }));
+      } catch (err) { log('POST tipoacceso error', err, true); }
+    };
+    document.getElementById('tipoUpdate').onclick = async () => {
+      if (!tipoId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(tipoId.value, 10), nombre: tipoNombre.value };
+        log('PUT /tipoacceso', await doFetch('/tipoacceso', { method: 'PUT', body: JSON.stringify(payload) }));
+      } catch (err) { log('PUT tipoacceso error', err, true); }
+    };
+    document.getElementById('tipoDelete').onclick = async () => {
+      if (!tipoId.value) return alert('Ingresa ID');
+      try {
+        const payload = { id: parseInt(tipoId.value, 10) };
+        log('DELETE /tipoacceso', await doFetch('/tipoacceso', { method: 'DELETE', body: JSON.stringify(payload) }));
+      } catch (err) { log('DELETE tipoacceso error', err, true); }
+    };
+  </script>
+</body>
+</html>

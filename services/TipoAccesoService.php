@@ -5,8 +5,8 @@ require_once __DIR__ . '/../dto/TipoAccesoResponseDTO.php';
 class TipoAccesoService {
     private $repository;
 
-    public function __construct() {
-        $this->repository = new TipoAccesoRepository();
+    public function __construct($pais) {
+        $this->repository = new TipoAccesoRepository($pais);
     }
 
     public function getAll() {

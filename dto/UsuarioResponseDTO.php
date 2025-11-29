@@ -6,6 +6,7 @@ class UsuarioResponseDTO {
     public $nombres;
     public $apellidos;
     public $correo;
+    public $pais;
 
     public function __construct($data = []) {  // constructor que recibe un array de datos de la base de datos, asigna los valores del array si existen o null si no
         $this->id = $data['id'] ?? null; 
@@ -13,9 +14,10 @@ class UsuarioResponseDTO {
         $this->nombres = $data['nombres'] ?? null;
         $this->apellidos = $data['apellidos'] ?? null;
         $this->correo = $data['correo'] ?? null;
+        $this->pais = $data['pais'] ?? null;
     }
     // metodo para convertir el objeto DTO a un array asociativo listo para respuesta en JSON
     public function toArray(): array {
-        return ['id'=>$this->id,'username'=>$this->username,'nombres'=>$this->nombres,'apellidos'=>$this->apellidos,'correo'=>$this->correo];
+        return ['id'=>$this->id,'username'=>$this->username,'nombres'=>$this->nombres,'apellidos'=>$this->apellidos,'correo'=>$this->correo,'pais'=>$this->pais];
     }
 }

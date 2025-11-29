@@ -1,56 +1,99 @@
 <?php
-// Service para llevar la Lógica de negocio de estudiantes, tambien encapsulamos operaciones, reglas, y validaciones antes de ir al repositorio
-
-// incluimos repositorios, dtos, y mappers
 require_once __DIR__ . '/../repositories/EstudianteRepository.php';
 require_once __DIR__ . '/../dto/EstudianteRequestDTO.php';
 require_once __DIR__ . '/../dto/EstudianteResponseDTO.php';
 require_once __DIR__ . '/../mapper/EstudianteMapper.php';
+require_once __DIR__ . '/../helpers/JWTHelper.php';
+require_once __DIR__ . '/../connection/DatabaseFactory.php';
 
 class EstudianteService {
-    // creamos una propiedad privada que lamacena la instancia del repositorio
     private EstudianteRepository $repo;
+    private string $pais;
+    private int $currentUserId;
 
-    // constructor que inicializa el repositorio
     public function __construct() {
-        $this->repo = new EstudianteRepository(); // nueva instancia del repositorio
+        // Obtener país y usuario desde el token
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? null;
+        if (!$authHeader) {
+            throw new Exception("Token JWT no encontrado en la cabecera Authorization.");
+        }
+
+        $decodedPais = JWTHelper::getPaisFromToken($authHeader);
+        if (!$decodedPais) {
+            throw new Exception("No se pudo determinar el país desde el token JWT.");
+        }
+
+        $decodedUser = JWTHelper::getUserIdFromToken($authHeader);
+        if (!$decodedUser) {
+            throw new Exception("No se pudo determinar el ID del usuario desde el token JWT.");
+        }
+
+        $this->pais = $decodedPais;
+        $this->currentUserId = (int)$decodedUser;
+
+        // Log para debug
+        error_log("Pais desde token: " . $this->pais);
+        error_log("UserId desde token: " . $this->currentUserId);
+
+        // --- VERIFICAR USUARIO EXISTE EN LA DB ---
+        try {
+            $conexion = DatabaseFactory::getConnection($this->pais);
+            if ($conexion instanceof PDO) { // Postgres o SQL Server
+                $stmt = $conexion->prepare("SELECT id, username FROM usuarios WHERE id = :id");
+                $stmt->execute([':id' => $this->currentUserId]);
+                $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
+            } else { // MySQLi
+                $stmt = $conexion->prepare("SELECT id, username FROM usuarios WHERE id = ?");
+                $stmt->bind_param("i", $this->currentUserId);
+                $stmt->execute();
+                $usuario = $stmt->get_result()->fetch_assoc();
+            }
+
+            if (!$usuario) {
+                error_log("Usuario no encontrado en {$this->pais}: ID = " . $this->currentUserId);
+                throw new Exception("Usuario no existe en {$this->pais}. Status 401.");
+            } else {
+                error_log("Usuario encontrado en {$this->pais}: ID = " . $usuario['id'] . ", Username = " . $usuario['username']);
+            }
+        } catch (Exception $ex) {
+            error_log("Error verificando usuario: " . $ex->getMessage());
+            throw $ex;
+        }
+        // --- FIN VERIFICACIÓN ---
+
+        // Crear repositorio
+        $this->repo = new EstudianteRepository($this->pais);
     }
 
-    // obtener todos los estudiantes
     public function getAll(): array {
-        $estudiantes = $this->repo->findAll();  // llama al metodo del repositorio para tener todos los registros
-        // convierte cada entidad Estudiante a ResponseDTO antes de devolverlo
-        return array_map(fn($d) => EstudianteMapper::mapEntityToResponseDTO($d), $estudiantes); // el array estudiantes tiene todos los objetos Estudiantes del FindAll. el array map es una funcion de php que aplica una funcion a cada elemento de un array y devuelve un nuevo array con los resultados. el fd($d) es una funcion anonima que recibe un elemento $d del array y lo pasa al mapper para volverlo DTO, y devuelve un array map donce cada objeto Estudiante se convirtió en un dto
+        $estudiantes = $this->repo->findAll();
+        return array_map(fn($e) => EstudianteMapper::mapEntityToResponseDTO($e), $estudiantes);
     }
 
-    // obtener estudiante por ID
     public function getById($id): ?EstudianteResponseDTO {
-        $estudiante = $this->repo->findById($id); // llama al metodo repositorio para obtener un regirstro por ID
-        return $estudiante ? EstudianteMapper::mapEntityToResponseDTO($estudiante) : null; // Si existe, lo convierte a un responseDTO si no, devuelve null
+        $estudiante = $this->repo->findById($id);
+        return $estudiante ? EstudianteMapper::mapEntityToResponseDTO($estudiante) : null;
     }
 
-    // creamos un nuevo estudiante, dto son los datos recibidos para la peticion
-    public function create(EstudianteRequestDTO $dto, int $currentUserId): EstudianteResponseDTO {
-        // primero transformatos los datos del DTO a un objeto Estudiante
-        $estudiante = EstudianteMapper::mapRequestDTOToEntity($dto, false); // false es creacion
-        $estudiante->setUsuarioCreacion($currentUserId);  // seteamos quien creo el registro
-        $estudiante->setFechaCreacion(date('Y-m-d H:i:s')); // fecha y hora actual
-        return $this->repo->create($estudiante);  // llamo al repositorio para insertar el estudiante en la bd y retornamos el DTO resultante
+    public function create(EstudianteRequestDTO $dto): EstudianteResponseDTO {
+        $estudiante = EstudianteMapper::mapRequestDTOToEntity($dto, false);
+        $estudiante->setUsuarioCreacion($this->currentUserId);
+        $estudiante->setFechaCreacion(date('Y-m-d H:i:s'));
+
+        return $this->repo->create($estudiante);
     }
 
-    // actualizar el estudiante, recibe un DTO con los datos recibidos en la peticion, y retorna un DTO acutalizado o null
-    public function update(EstudianteRequestDTO $dto, int $currentUserId): ?EstudianteResponseDTO {
-        // creamos un nuevo objeto a partir del DTO y se indica que es actualizacion
-        $estudiante = EstudianteMapper::mapRequestDTOToEntity($dto, true); // true es update
-        $estudiante->setUsuarioModificacion($currentUserId); // setamos quien actualizo el registro
-        $estudiante->setFechaModificacion(date('Y-m-d H:i:s')); // fecha y hora actual
-        return $this->repo->update($estudiante); // lamamos al repositorio para actualizar y devolvemos el DTO resultante
+    public function update(EstudianteRequestDTO $dto, $id): ?EstudianteResponseDTO {
+        $estudiante = EstudianteMapper::mapRequestDTOToEntity($dto, true);
+        $estudiante->setId($id);
+        $estudiante->setUsuarioModificacion($this->currentUserId);
+        $estudiante->setFechaModificacion(date('Y-m-d H:i:s'));
+
+        return $this->repo->update($estudiante);
     }
 
-    // eliminamos el estudiante por ID, recibimos el ID, y retornamos un bool si se elimino
     public function delete($id): bool {
-        $deleted = $this->repo->delete($id); // lamamos al repositorio para eliminar el registro
-        return $deleted ? true : false;
-    } 
+        return $this->repo->delete($id);
+    }
 }
 ?>

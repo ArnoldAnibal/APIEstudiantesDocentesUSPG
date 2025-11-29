@@ -1,43 +1,89 @@
 <?php
-require_once __DIR__ . '/../connection/db.php';
+require_once __DIR__ . '/../connection/DatabaseFactory.php';
 
 class RolRepository {
-    private mysqli $conn;
+    private $conn;
+    private string $dbType;
 
-    public function __construct() {
-        $this->conn = Database::getConnection();
+    public function __construct($pais) {
+        // Repositorio preparado para MySQL, Postgres y SQL Server
+        $this->conn = DatabaseFactory::getConnection($pais);
+        $this->dbType = $this->conn instanceof mysqli ? 'mysql' : 'pdo';
     }
 
     public function findAll() {
-        $res = $this->conn->query("SELECT id, nombre FROM rol");
-        return $res->fetch_all(MYSQLI_ASSOC);
+        $sql = "SELECT id, nombre FROM rol";
+        if ($this->dbType === 'mysql') {
+            $res = $this->conn->query($sql);
+            return $res->fetch_all(MYSQLI_ASSOC);
+        } else {
+            $stmt = $this->conn->query($sql);
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
     }
 
     public function findById(int $id) {
-        $stmt = $this->conn->prepare("SELECT id, nombre FROM rol WHERE id = ?");
-        $stmt->bind_param('i', $id);
-        $stmt->execute();
-        return $stmt->get_result()->fetch_assoc();
+        $sql = "SELECT id, nombre FROM rol WHERE id = ?";
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            return $stmt->get_result()->fetch_assoc();
+        } else {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([$id]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        }
     }
 
     public function create(array $data) {
-        $stmt = $this->conn->prepare("INSERT INTO rol (nombre) VALUES (?)");
-        $stmt->bind_param('s', $data['nombre']);
-        if (!$stmt->execute()) throw new Exception($stmt->error);
-        return $this->findById($stmt->insert_id);
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare("INSERT INTO rol (nombre) VALUES (?)");
+            $stmt->bind_param('s', $data['nombre']);
+            if (!$stmt->execute()) throw new Exception($stmt->error);
+            $insertId = $this->conn->insert_id;
+        } else {
+            $driver = $this->conn->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlsrv') {
+                $stmt = $this->conn->prepare("INSERT INTO rol (nombre) OUTPUT INSERTED.id VALUES (?)");
+                $stmt->execute([$data['nombre']]);
+                $insertId = (int)$stmt->fetchColumn();
+            } elseif ($driver === 'pgsql') {
+                $stmt = $this->conn->prepare("INSERT INTO rol (nombre) VALUES (?) RETURNING id");
+                $stmt->execute([$data['nombre']]);
+                $insertId = (int)$stmt->fetchColumn();
+            } else {
+                $stmt = $this->conn->prepare("INSERT INTO rol (nombre) VALUES (?)");
+                $stmt->execute([$data['nombre']]);
+                $insertId = (int)$this->conn->lastInsertId();
+            }
+        }
+        return $this->findById($insertId);
     }
 
     public function update(int $id, array $data) {
-        $stmt = $this->conn->prepare("UPDATE rol SET nombre=? WHERE id=?");
-        $stmt->bind_param('si', $data['nombre'], $id);
-        if (!$stmt->execute()) throw new Exception($stmt->error);
+        $sql = "UPDATE rol SET nombre=? WHERE id=?";
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('si', $data['nombre'], $id);
+            if (!$stmt->execute()) throw new Exception($stmt->error);
+        } else {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([$data['nombre'], $id]);
+        }
         return $this->findById($id);
     }
 
     public function delete(int $id) {
-        $stmt = $this->conn->prepare("DELETE FROM rol WHERE id=?");
-        $stmt->bind_param('i', $id);
-        if (!$stmt->execute()) throw new Exception($stmt->error);
+        $sql = "DELETE FROM rol WHERE id=?";
+        if ($this->dbType === 'mysql') {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->bind_param('i', $id);
+            if (!$stmt->execute()) throw new Exception($stmt->error);
+        } else {
+            $stmt = $this->conn->prepare($sql);
+            $stmt->execute([$id]);
+        }
         return ['mensaje' => "Rol $id eliminado"];
     }
 }
